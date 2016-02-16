@@ -72,7 +72,6 @@ User-visible changes worth mentioning.
 
 ## 2.2.2 (unreleased)
 
->>>>>>> 56bfa579484ae9e554028b081227ec8d1b74c21d
 - [#541] Fixed `undefined method attr_accessible` problem on Rails 4
     (happens only when ProtectedAttributes gem is used) in #599
 - [#689] Allow scopes to me resetted to empty in Mongoid
