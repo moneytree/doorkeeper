@@ -94,7 +94,7 @@ module Doorkeeper::OAuth
     end
 
     context 'longer lived refresh tokens' do
-      let(:server) { double :server, access_token_expires_in: 2.minutes, custom_access_token_expires_in: -> (_oauth_client) { nil },
+      let(:server) { double :server, access_token_expires_in: 2.minutes, custom_access_token_expires_in: -> (_oauth_client) { puts _oauth_client.inspect },
                             refresh_token_revoked_in: 1.day, refresh_token_revoked_on_use: false }
 
       it 'revokes the previous token' do
