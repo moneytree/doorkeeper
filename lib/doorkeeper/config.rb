@@ -198,6 +198,8 @@ and that your `initialize_models!` method doesn't raise any errors.\n
     option :realm,                          default: 'Doorkeeper'
     option :force_ssl_in_redirect_uri,      default: !Rails.env.development?
     option :grant_flows,                    default: %w(authorization_code client_credentials)
+    # TODO: gets removed later when doorkeeper is merged back
+    option :wildcard_redirect_uri,         default: false
 
     attr_reader :reuse_access_token
 
