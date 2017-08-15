@@ -4,6 +4,69 @@ User-visible changes worth mentioning.
 
 ---
 
+## 3.1.0
+
+- [#736] Existing valid tokens are now reused in client_credentials flow
+- [#749] Allow user to raise authorization error with custom messages.
+  Under `resource_owner_authenticator` block a user can
+  `raise Doorkeeper::Errors::DoorkeeperError.new('custom_message')`
+- [#762] Check doesn’t abort the actual migration, so it runs
+- [#722] `doorkeeper_forbidden_render_options` now supports returning a 404 by
+  specifying `respond_not_found_when_forbidden: true` in the
+  `doorkeeper_forbidden_render_options` method.
+- [#734] Simplify and remove duplication in request strategy classes
+
+## 3.0.1
+
+- [#712] Wrap exchange of grant token for access token and access token refresh
+  in transactions
+- [#704] Allow applications scopes to be mass assigned
+- [#707] Fixed order of Mixin inclusion and table_name configuration in models
+- [#712] Wrap access token and refresh grants in transactions
+- Adds JRuby support
+- Specs, views and documentation adjustments
+
+## 3.0.0
+
+### Other changes
+
+- [#693] Updates `en.yml`.
+
+## 3.0.0 (rc2)
+
+### Backward incompatible changes
+
+- [#678] Change application-specific scopes to take precedence over server-wide
+  scopes. This removes the previous behavior where the intersection between
+  application and server scopes was used.
+
+### Other changes
+
+- [#671] Fixes `NoMethodError - undefined method 'getlocal'` when calling
+  the /oauth/token path. Switch from using a DateTime object to update
+  AR to using a Time object. (Issue #668)
+- [#677] Support editing application-specific scopes via the standard forms
+- [#682] Pass error hash to Grape `error!`
+- [#683] Generate application secret/UID if fields are blank strings
+
+## 3.0.0 (rc1)
+
+### Backward incompatible changes
+
+- [#648] Extracts mongodb ORMs to
+  https://github.com/doorkeeper-gem/doorkeeper-mongodb. If you use ActiveRecord
+  you don’t need to do any change, otherwise you will need to install the new
+  plugin.
+- [#665] `doorkeeper_unauthorized_render_options(error:)` and
+  `doorkeeper_forbidden_render_options(error:)` now accept `error` keyword
+  argument.
+
+### Removed deprecations
+
+- Removes `doorkeeper_for` deprecation notice.
+- Remove `applications.scopes` upgrade notice.
+
+
 ## 2.2.2
 
 - [#654] Fixed `check_requirements` not to abort when ActiveRecord

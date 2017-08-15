@@ -14,18 +14,17 @@ functionality to your Rails or Grape application.
 ## Documentation valid for `master` branch
 
 Please check the documentation for the version of doorkeeper you are using in:
-https://github.com/doorkeeper-gem/doorkeeper/releases.
+https://github.com/doorkeeper-gem/doorkeeper/releases
 
 ## Table of Contents
 
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 - [Useful links](#useful-links)
-- [Requirements](#requirements)
 - [Installation](#installation)
 - [Configuration](#configuration)
     - [Active Record](#active-record)
-    - [Mongoid / MongoMapper](#mongoid--mongomapper)
-        - [Mongoid indexes](#mongoid-indexes)
-        - [MongoMapper indexes](#mongomapper-indexes)
+    - [Other ORMs](#other-orms)
     - [Routes](#routes)
     - [Authenticating](#authenticating)
     - [Internationalization (I18n)](#internationalization-i18n)
@@ -42,24 +41,18 @@ https://github.com/doorkeeper-gem/doorkeeper/releases.
 - [Contributing](#contributing)
 - [Other resources](#other-resources)
     - [Wiki](#wiki)
-    - [Live demo](#live-demo)
     - [Screencast](#screencast)
     - [Client applications](#client-applications)
     - [Contributors](#contributors)
     - [IETF Standards](#ietf-standards)
     - [License](#license)
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
 
 ## Useful links
 
 - For documentation, please check out our [wiki](https://github.com/doorkeeper-gem/doorkeeper/wiki)
 - For general questions, please post it in [stack overflow](http://stackoverflow.com/questions/tagged/doorkeeper)
-
-## Requirements
-
-- Ruby >= 2.0.0
-- Rails >= 3.2
-- ORM ActiveRecord, Mongoid, MongoMapper
 
 ## Installation
 
@@ -88,29 +81,12 @@ Don't forget to run the migration with:
 
     rake db:migrate
 
-### Mongoid / MongoMapper
+### Other ORMs
 
-Doorkeeper currently supports MongoMapper, Mongoid 2 and 3. To start using it,
-you have to set the `orm` configuration:
+See [doorkeeper-mongodb project] for mongoid and mongomapper support. Follow along
+the implementation in that repository to extend doorkeeper with other ORMs.
 
-``` ruby
-Doorkeeper.configure do
-  orm :mongoid2 # or :mongoid3, :mongoid4, :mongo_mapper
-end
-```
-
-#### Mongoid indexes
-
-Make sure you create indexes for doorkeeper models. You can do this either by
-running `rake db:mongoid:create_indexes` or (if you're using Mongoid 2) by
-adding `autocreate_indexes: true` to your `config/mongoid.yml`
-
-#### MongoMapper indexes
-
-Generate the `db/indexes.rb` file and create indexes for the doorkeeper models:
-
-    rails generate doorkeeper:mongo_mapper:indexes
-    rake db:index
+[doorkeeper-mongodb project]: https://github.com/doorkeeper-gem/doorkeeper-mongodb
 
 ### Routes
 
@@ -285,7 +261,7 @@ have both `:admin` and `:write` scopes.
 
 ### Custom Access Token Generator
 
-By default a 32 bit access token will be generated. If you require a custom
+By default a 128 bit access token will be generated. If you require a custom
 token, such as [JWT](http://jwt.io), specify an object that responds to
 `.generate(options = {})` and returns a string to be used as the token.
 
@@ -357,7 +333,9 @@ wiki](https://github.com/doorkeeper-gem/doorkeeper/wiki/Customizing-routes).
 If you want to upgrade doorkeeper to a new version, check out the [upgrading
 notes](https://github.com/doorkeeper-gem/doorkeeper/wiki/Migration-from-old-versions)
 and take a look at the
-[changelog](https://github.com/doorkeeper-gem/doorkeeper/blob/master/CHANGELOG.md).
+[changelog](https://github.com/doorkeeper-gem/doorkeeper/blob/master/NEWS.md).
+
+Doorkeeper follows [semantic versioning](http://semver.org/).
 
 ## Development
 
@@ -395,12 +373,6 @@ page](https://github.com/doorkeeper-gem/doorkeeper/wiki/Contributing).
 You can find everything about doorkeeper in our [wiki
 here](https://github.com/doorkeeper-gem/doorkeeper/wiki).
 
-### Live demo
-
-Check out this [live demo](http://doorkeeper-provider.herokuapp.com) hosted on
-heroku. For more demos check out [the
-wiki](https://github.com/doorkeeper-gem/doorkeeper/wiki/Example-Applications).
-
 ### Screencast
 
 Check out this screencast from [railscasts.com](http://railscasts.com/): [#353
@@ -418,15 +390,15 @@ here](https://github.com/doorkeeper-gem/doorkeeper/wiki/Testing-your-provider-wi
 ### Contributors
 
 Thanks to all our [awesome
-contributors](https://github.com/doorkeeper-gem/doorkeeper/contributors)!
+contributors](https://github.com/doorkeeper-gem/doorkeeper/graphs/contributors)!
 
 
 ### IETF Standards
 
 * [The OAuth 2.0 Authorization Framework](http://tools.ietf.org/html/rfc6749)
 * [OAuth 2.0 Threat Model and Security Considerations](http://tools.ietf.org/html/rfc6819)
+* [OAuth 2.0 Token Revocation](http://tools.ietf.org/html/rfc7009)
 
 ### License
 
 MIT License. Copyright 2011 Applicake.
-[http://applicake.com](http://applicake.com)
