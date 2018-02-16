@@ -31,11 +31,6 @@ module Doorkeeper
               code: auth.token.token,
               state: pre_auth.state,
           }
-          # only include code_challenge info in the redirect if we have it
-          if pre_auth.code_challenge.present?
-            params[:code_challenge] = pre_auth.code_challenge
-            params[:code_challenge_method] = pre_auth.code_challenge_method
-          end
           Authorization::URIBuilder.uri_with_query(pre_auth.redirect_uri, params)
         end
       end
