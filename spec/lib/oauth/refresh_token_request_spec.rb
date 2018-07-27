@@ -5,14 +5,17 @@ module Doorkeeper::OAuth
     before do
       allow(Doorkeeper::AccessToken).to receive(:refresh_token_revoked_on_use?).and_return(false)
     end
+
     let(:server) do
       double :server,
              access_token_expires_in: 2.minutes,
              custom_access_token_expires_in: -> (_oauth_client) { nil }
     end
+
     let(:refresh_token) do
-      FactoryGirl.create(:access_token, use_refresh_token: true)
+      FactoryBot.create(:access_token, use_refresh_token: true)
     end
+
     let(:client) { refresh_token.application }
     let(:credentials) { Client::Credentials.new(client.uid, client.secret) }
 
@@ -20,7 +23,8 @@ module Doorkeeper::OAuth
 
     it 'issues a new token for the client' do
       expect { subject.authorize }.to change { client.reload.access_tokens.count }.by(1)
-      expect(client.reload.access_tokens.last.expires_in).to eq(120)
+      # #sort_by used for MongoDB ORM extensions for valid ordering
+      expect(client.reload.access_tokens.sort_by(&:created_at).last.expires_in).to eq(120)
     end
 
     it 'issues a new token for the client with custom expires_in' do
@@ -32,11 +36,18 @@ module Doorkeeper::OAuth
 
       RefreshTokenRequest.new(server, refresh_token, credentials).authorize
 
-      expect(client.reload.access_tokens.last.expires_in).to eq(1234)
+      # #sort_by used for MongoDB ORM extensions for valid ordering
+      expect(client.reload.access_tokens.sort_by(&:created_at).last.expires_in).to eq(1234)
     end
 
     it 'revokes the previous token' do
       expect { subject.authorize }.to change { refresh_token.revoked? }.from(false).to(true)
+    end
+
+    it "calls configured request callback methods" do
+      expect(Doorkeeper.configuration.before_successful_strategy_response).to receive(:call).with(subject).once
+      expect(Doorkeeper.configuration.after_successful_strategy_response).to receive(:call).with(subject, instance_of(Doorkeeper::OAuth::TokenResponse)).once
+      subject.authorize
     end
 
     it 'requires the refresh token' do
@@ -52,7 +63,7 @@ module Doorkeeper::OAuth
     end
 
     it "requires the token's client and current client to match" do
-      subject.client = FactoryGirl.create(:application)
+      subject.client = FactoryBot.create(:application)
       subject.validate
       expect(subject.error).to eq(:invalid_grant)
     end
@@ -93,13 +104,14 @@ module Doorkeeper::OAuth
       it 'sets the previous refresh token in the new access token' do
         subject.authorize
         expect(
-          client.access_tokens.last.previous_refresh_token
+          # #sort_by used for MongoDB ORM extensions for valid ordering
+          client.access_tokens.sort_by(&:created_at).last.previous_refresh_token
         ).to eq(refresh_token.refresh_token)
       end
     end
 
     context 'clientless access tokens' do
-      let!(:refresh_token) { FactoryGirl.create(:clientless_access_token, use_refresh_token: true) }
+      let!(:refresh_token) { FactoryBot.create(:clientless_access_token, use_refresh_token: true) }
 
       subject { RefreshTokenRequest.new server, refresh_token, nil }
 
@@ -110,7 +122,7 @@ module Doorkeeper::OAuth
 
     context 'with scopes' do
       let(:refresh_token) do
-        FactoryGirl.create :access_token,
+        FactoryBot.create :access_token,
                            use_refresh_token: true,
                            scopes: 'public write'
       end

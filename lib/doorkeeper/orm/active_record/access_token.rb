@@ -3,18 +3,29 @@ module Doorkeeper
     self.table_name = "#{table_name_prefix}oauth_access_tokens#{table_name_suffix}".to_sym
 
     include AccessTokenMixin
+    include ActiveModel::MassAssignmentSecurity if defined?(::ProtectedAttributes)
 
-    # Deletes all the Access Tokens created for the specific
-    # Application and Resource Owner.
-    #
-    # @param application_id [Integer] Application ID
-    # @param resource_owner [ActiveRecord::Base] Resource Owner model instance
-    #
-    def self.delete_all_for(application_id, resource_owner)
-      where(application_id: application_id,
-            resource_owner_id: resource_owner.id).delete_all
+    belongs_to_options = {
+      class_name: 'Doorkeeper::Application',
+      inverse_of: :access_tokens
+    }
+
+    if defined?(ActiveRecord::Base) && ActiveRecord::VERSION::MAJOR >= 5
+      belongs_to_options[:optional] = true
     end
-    private_class_method :delete_all_for
+
+    belongs_to :application, belongs_to_options
+
+    validates :token, presence: true, uniqueness: true
+    validates :refresh_token, uniqueness: true, if: :use_refresh_token?
+
+    # @attr_writer [Boolean, nil] use_refresh_token
+    #   indicates the possibility of using refresh token
+    attr_writer :use_refresh_token
+
+    before_validation :generate_token, on: :create
+    before_validation :generate_refresh_token,
+                      on: :create, if: :use_refresh_token?
 
     # Searches for not revoked Access Tokens associated with the
     # specific Resource Owner.
@@ -29,18 +40,8 @@ module Doorkeeper
       where(resource_owner_id: resource_owner.id, revoked_at: nil)
     end
 
-    # ORM-specific order method.
-    def self.order_method
-      :order
-    end
-
     def self.refresh_token_revoked_on_use?
       column_names.include?('previous_refresh_token')
-    end
-
-    # ORM-specific DESC order for `:created_at` column.
-    def self.created_at_desc
-      'created_at desc'
     end
   end
 end

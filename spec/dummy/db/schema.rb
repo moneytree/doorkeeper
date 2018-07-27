@@ -54,6 +54,7 @@ ActiveRecord::Schema.define(version: 20170822064514) do
     t.datetime "updated_at",                null: false
     t.integer  "owner_id"
     t.string   "owner_type"
+    t.boolean "confidential", default: true, null: false
   end
 
   add_index "oauth_applications", ["owner_id", "owner_type"], name: "index_oauth_applications_on_owner_id_and_owner_type"

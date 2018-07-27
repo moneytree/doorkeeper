@@ -6,6 +6,7 @@ module Doorkeeper
     include Models::Expirable
     include Models::Revocable
     include Models::Accessible
+    include Models::Orderable
     include Models::Scopes
     include ActiveModel::MassAssignmentSecurity if defined?(::ProtectedAttributes)
 
@@ -85,16 +86,6 @@ module Doorkeeper
         padded_result = Base64.urlsafe_encode64(Digest::SHA256.digest(code_verifier))
         padded_result.split('=')[0] # Remove any trailing '='
       end
-    end
-
-    private
-
-    # Generates token value with UniqueToken class.
-    #
-    # @return [String] token value
-    #
-    def generate_token
-      self.token = UniqueToken.generate
     end
   end
 end

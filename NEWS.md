@@ -4,6 +4,51 @@ User-visible changes worth mentioning.
 
 ## master
 
+## 4.4.0
+
+- [#1120] Backport security fix from 5.x for token revocation when using public clients
+
+## 4.3.2
+
+- [#1053] Support authorizing with query params in the request `redirect_uri` if explicitly present in app's `Application#redirect_uri`
+
+## 4.3.1
+
+- Remove `BaseRecord` and introduce additional concern for ordering methods to fix
+  braking changes for Doorkeeper models.
+- [#1032] Refactor BaseRequest callbacks into configurable lambdas
+- [#1040] Clear mixins from ActiveRecord DSL and save only overridable API. It
+  allows to use this mixins in Doorkeeper ORM extensions with minimum code boilerplate.
+
+## 4.3.0
+
+- [#976] Fix to invalidate the second redirect URI when the first URI is the native URI
+- [#1035] Allow `Application#redirect_uri=` to handle array of URIs.
+- [#1036] Allow to forbid Application redirect URI's with specific rules.
+- [#1029] Deprecate `order_method` and introduce `ordered_by`. Sort applications
+  by `created_at` in index action.
+- [#1033] Allow Doorkeeper configuration option #force_ssl_in_redirect_uri to be a callable object.
+- Fix Grape integration & add specs for it
+- [#913] Deferred ORM (ActiveRecord) models loading
+- [#943] Fix Access Token token generation when certain errors occur in custom token generators
+- [#1026] Implement RFC7662 - OAuth 2.0 Token Introspection
+- [#985] Generate valid migration files for Rails >= 5
+- [#972] Replace Struct subclassing with block-form initialization
+- [#1003] Use URL query param to pass through native redirect auth code so automated apps can find it.
+- [#868] `Scopes#&` and `Scopes#+` now take an array or any other enumerable
+  object.
+- [#1019] Remove translation not in use: `invalid_resource_owner`.
+- Use Ruby 2 hash style syntax (min required Ruby version = 2.1)
+- [#948] Make Scopes.<=> work with any "other" value.
+- [#974] Redirect URI is checked without query params within AuthorizationCodeRequest.
+- [#1004] More explicit help text for `native_redirect_uri`.
+- [#1023] Update Ruby versions and test against 2.5.0 on Travis CI.
+- [#1024] Migrate from FactoryGirl to FactoryBot.
+- [#1025] Improve documentation for adding foreign keys
+- [#1028] Make it possible to have composite strategy names.
+
+## 4.2.6
+
 - [#970] Escape certain attributes in authorization forms.
 
 ## 4.2.5

@@ -4,7 +4,7 @@ module Doorkeeper
       response = authorize_response
       headers.merge! response.headers
       self.response_body = response.body.to_json
-      self.status        = response.status
+      self.status = response.status
     rescue Errors::DoorkeeperError => e
       handle_token_exception e
     end
@@ -27,6 +27,18 @@ module Doorkeeper
       render json: {}, status: 200
     end
 
+    def introspect
+      introspection = OAuth::TokenIntrospection.new(server, token)
+
+      if introspection.authorized?
+        render json: introspection.to_json, status: 200
+      else
+        error = OAuth::ErrorResponse.new(name: introspection.error)
+        response.headers.merge!(error.headers)
+        render json: error.body, status: error.status
+      end
+    end
+
     private
 
     # OAuth 2.0 Section 2.1 defines two client types, "public" & "confidential".
@@ -46,16 +58,15 @@ module Doorkeeper
     # https://tools.ietf.org/html/rfc6749#section-2.1
     # https://tools.ietf.org/html/rfc7009
     def authorized?
-      if token.present?
-        # Client is confidential, therefore client authentication & authorization
-        # is required
-        if token.application_id?
-          # We authorize client by checking token's application
-          server.client && server.client.application == token.application
-        else
-          # Client is public, authentication unnecessary
-          true
-        end
+      return unless token.present?
+      # Client is confidential, therefore client authentication & authorization
+      # is required
+      if token.application_id? && token.application.confidential?
+        # We authorize client by checking token's application
+        server.client && server.client.application == token.application
+      else
+        # Client is public, authentication unnecessary
+        true
       end
     end
 

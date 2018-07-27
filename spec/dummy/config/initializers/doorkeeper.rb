@@ -82,7 +82,18 @@ Doorkeeper.configure do
   #   http://tools.ietf.org/html/rfc6819#section-4.4.2
   #   http://tools.ietf.org/html/rfc6819#section-4.4.3
   #
-  # grant_flows %w(authorization_code client_credentials)
+  # grant_flows %w[authorization_code client_credentials]
+
+  # Hook into the strategies' request & response life-cycle in case your
+  # application needs advanced customization or logging:
+  #
+  # before_successful_strategy_response do |request|
+  #   puts "BEFORE HOOK FIRED! #{request}"
+  # end
+  #
+  # after_successful_strategy_response do |request, response|
+  #   puts "AFTER HOOK FIRED! #{request}, #{response}"
+  # end
 
   # Under some circumstances you might want to have applications auto-approved,
   # so that the user skips the authorization step.

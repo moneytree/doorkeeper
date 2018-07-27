@@ -6,32 +6,8 @@ module Doorkeeper
     include Models::Expirable
     include Models::Revocable
     include Models::Accessible
+    include Models::Orderable
     include Models::Scopes
-    include ActiveModel::MassAssignmentSecurity if defined?(::ProtectedAttributes)
-
-    included do
-      belongs_to_options = {
-        class_name: 'Doorkeeper::Application',
-        inverse_of: :access_tokens
-      }
-      if defined?(ActiveRecord::Base) && ActiveRecord::VERSION::MAJOR >= 5
-        belongs_to_options[:optional] = true
-      end
-
-      belongs_to :application, belongs_to_options
-
-      validates :token, presence: true, uniqueness: true
-      validates :refresh_token, uniqueness: true, if: :use_refresh_token?
-
-      # @attr_writer [Boolean, nil] use_refresh_token
-      #   indicates the possibility of using refresh token
-      attr_writer :use_refresh_token
-
-      before_validation :generate_token, on: :create
-      before_validation :generate_refresh_token,
-                        on: :create,
-                        if: :use_refresh_token?
-    end
 
     module ClassMethods
       # Returns an instance of the Doorkeeper::AccessToken with
@@ -68,11 +44,11 @@ module Doorkeeper
       # @param resource_owner [ActiveRecord::Base]
       #   instance of the Resource Owner model
       #
-      def revoke_all_for(application_id, resource_owner)
+      def revoke_all_for(application_id, resource_owner, clock = Time)
         where(application_id: application_id,
               resource_owner_id: resource_owner.id,
               revoked_at: nil).
-          each(&:revoke)
+          update_all(revoked_at: clock.now.utc)
       end
 
       # Looking for not expired Access Token with a matching set of scopes
@@ -110,7 +86,7 @@ module Doorkeeper
       # @param app_scopes [String]
       #   Application scopes
       #
-      # @return [Boolean] true if all scopes and blank or matches
+      # @return [Boolean] true if all scopes are blank or matches
       #   and false in other cases
       #
       def scopes_match?(token_scopes, param_scopes, app_scopes)
@@ -168,7 +144,7 @@ module Doorkeeper
       #   nil if nothing was found
       #
       def last_authorized_token_for(application_id, resource_owner_id)
-        send(order_method, created_at_desc).
+        ordered_by(:created_at, :desc).
           find_by(application_id: application_id,
                   resource_owner_id: resource_owner_id,
                   revoked_at: nil)
@@ -231,7 +207,7 @@ module Doorkeeper
     # @return [String] refresh token value
     #
     def generate_refresh_token
-      write_attribute :refresh_token, UniqueToken.generate
+      self.refresh_token = UniqueToken.generate
     end
 
     # Generates and sets the token value with the
@@ -247,18 +223,24 @@ module Doorkeeper
     def generate_token
       self.created_at ||= Time.now.utc
 
-      generator = Doorkeeper.configuration.access_token_generator.constantize
-      self.token = generator.generate(
+      self.token = token_generator.generate(
         resource_owner_id: resource_owner_id,
         scopes: scopes,
         application: application,
         expires_in: expires_in,
         created_at: created_at
       )
-    rescue NoMethodError
+    end
+
+    def token_generator
+      generator_name = Doorkeeper.configuration.access_token_generator
+      generator = generator_name.constantize
+
+      return generator if generator.respond_to?(:generate)
+
       raise Errors::UnableToGenerateToken, "#{generator} does not respond to `.generate`."
     rescue NameError
-      raise Errors::TokenGeneratorNotFound, "#{generator} not found"
+      raise Errors::TokenGeneratorNotFound, "#{generator_name} not found"
     end
   end
 end

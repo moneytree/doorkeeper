@@ -13,14 +13,9 @@ module Doorkeeper::OAuth
         created_at:         0
     end
 
-    let(:client) do
-      double :client,
-        id: '1'
-    end
+    let(:client) { double :client, id: '1' }
 
-    let(:scopes_array) do
-      %w(public write)
-    end
+    let(:scopes_array) { %w[public write] }
 
     let(:server) do
       double :server,
@@ -74,7 +69,7 @@ module Doorkeeper::OAuth
         it "returns an ErrorResponse object" do
           error_description = I18n.translate(
             "server_error",
-            scope: [:doorkeeper, :errors, :messages]
+            scope: %i[doorkeeper errors messages]
           )
 
           result = subject.authorize

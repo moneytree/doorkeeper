@@ -3,7 +3,7 @@ require 'spec_helper_integration'
 describe Doorkeeper::AuthorizationsController, 'implicit grant flow' do
   include AuthorizationRequestHelper
 
-  if Rails::VERSION::MAJOR == 5
+  if Rails::VERSION::MAJOR >= 5
     class ActionDispatch::TestResponse
       def query_params
         @_query_params ||= begin
@@ -24,12 +24,12 @@ describe Doorkeeper::AuthorizationsController, 'implicit grant flow' do
   end
 
   def translated_error_message(key)
-    I18n.translate key, scope: [:doorkeeper, :errors, :messages]
+    I18n.translate key, scope: %i[doorkeeper errors messages]
   end
 
-  let(:client)        { FactoryGirl.create :application }
+  let(:client)        { FactoryBot.create :application }
   let(:user)          { User.create!(name: 'Joe', password: 'sekret') }
-  let(:access_token)  { FactoryGirl.build :access_token, resource_owner_id: user.id, application_id: client.id }
+  let(:access_token)  { FactoryBot.build :access_token, resource_owner_id: user.id, application_id: client.id }
 
   before do
     allow(Doorkeeper.configuration).to receive(:grant_flows).and_return(["implicit"])
@@ -144,7 +144,7 @@ describe Doorkeeper::AuthorizationsController, 'implicit grant flow' do
   describe 'GET #new code request with native url and skip_authorization true' do
     before do
       allow(Doorkeeper.configuration).to receive(:grant_flows).
-        and_return(%w(authorization_code))
+        and_return(%w[authorization_code])
       allow(Doorkeeper.configuration).to receive(:skip_authorization).and_return(proc do
         true
       end)
@@ -154,7 +154,7 @@ describe Doorkeeper::AuthorizationsController, 'implicit grant flow' do
 
     it 'should redirect immediately' do
       expect(response).to be_redirect
-      expect(response.location).to match(/oauth\/authorize\//)
+      expect(response.location).to match(/oauth\/authorize\/native\?code=#{Doorkeeper::AccessGrant.first.token}/)
     end
 
     it 'should issue a grant' do
