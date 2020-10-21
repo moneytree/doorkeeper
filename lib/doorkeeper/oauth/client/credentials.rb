@@ -23,9 +23,10 @@ module Doorkeeper
           end
         end
 
-        def blank?
-          uid.blank? || secret.blank?
-        end
+        # https://github.com/doorkeeper-gem/doorkeeper/blob/master/lib/doorkeeper/oauth/client/credentials.rb
+        # Public clients may have their secret blank, but "credentials" are
+        # still present
+        delegate :blank?, to: :uid
       end
     end
   end

@@ -17,3 +17,4 @@ spec/generators/tmp
 /doc/
 /rdoc/
 coverage
+*/.DS_Store
