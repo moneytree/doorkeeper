@@ -248,6 +248,9 @@ doorkeeper.
     option :base_controller,
            default: 'ActionController::Base'
 
+    option :access_token_class,
+           default: 'AccessToken'
+
     attr_reader :reuse_access_token
 
     def refresh_token_enabled?
@@ -291,6 +294,10 @@ doorkeeper.
 
     def token_grant_types
       @token_grant_types ||= calculate_token_grant_types
+    end
+
+    def access_token_model
+      @access_token_model ||= Doorkeeper.configuration.access_token_class.constantize
     end
 
     private

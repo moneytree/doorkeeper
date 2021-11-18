@@ -38,7 +38,7 @@ module Doorkeeper
       end
 
       def refresh_token_revoked_on_use?
-        Doorkeeper::AccessToken.refresh_token_revoked_on_use?
+        Doorkeeper.configuration.access_token_model.refresh_token_revoked_on_use?
       end
 
       def default_scopes
@@ -46,7 +46,7 @@ module Doorkeeper
       end
 
       def create_access_token
-        @access_token = AccessToken.create!(access_token_attributes)
+        @access_token = Doorkeeper.configuration.access_token_model.create!(access_token_attributes)
       end
 
       def access_token_attributes

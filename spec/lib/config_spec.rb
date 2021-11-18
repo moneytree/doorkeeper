@@ -331,4 +331,21 @@ describe Doorkeeper, 'configuration' do
       it { expect(Doorkeeper.configuration.base_controller).to eq('ApplicationController') }
     end
   end
+
+  describe 'access_token_class' do
+    it 'uses default doorkeeper value' do
+      expect(subject.access_token_class).to eq("Doorkeeper::AccessToken")
+      expect(subject.access_token_model).to be(Doorkeeper::AccessToken)
+    end
+
+    it 'can change the value' do
+      Doorkeeper.configure do
+        orm DOORKEEPER_ORM
+        access_token_class 'FakeCustomModel'
+      end
+
+      expect(subject.access_token_class).to eq('FakeCustomModel')
+      expect(subject.access_token_model).to be(FakeCustomModel)
+    end
+  end
 end

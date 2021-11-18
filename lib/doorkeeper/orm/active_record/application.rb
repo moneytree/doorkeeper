@@ -17,7 +17,7 @@ module Doorkeeper
     #   Applications authorized for the Resource Owner
     #
     def self.authorized_for(resource_owner)
-      resource_access_tokens = AccessToken.active_for(resource_owner)
+      resource_access_tokens = Doorkeeper.configuration.access_token_model.active_for(resource_owner)
       where(id: resource_access_tokens.select(:application_id).distinct)
     end
   end
