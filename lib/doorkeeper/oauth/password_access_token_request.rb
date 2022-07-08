@@ -26,7 +26,13 @@ module Doorkeeper
 
       def validate_scopes
         return true unless @original_scopes.present?
-        ScopeChecker.valid? @original_scopes, server.scopes, client.try(:scopes)
+
+        ScopeChecker.valid?(
+          scope_str: @original_scopes,
+          server_scopes: server.scopes,
+          app_scopes: client.try(:scopes),
+          grant_type: Doorkeeper::OAuth::PASSWORD
+        )
       end
 
       def validate_resource_owner

@@ -25,8 +25,7 @@ module Doorkeeper
         end
 
         def validate_scopes
-          return true unless @request.scopes.present?
-
+          return true if @request.scopes.blank?
           application_scopes = if @client.present?
                                  @client.application.scopes
                                else
@@ -34,9 +33,10 @@ module Doorkeeper
                                end
 
           ScopeChecker.valid?(
-            @request.scopes.to_s,
-            @server.scopes,
-            application_scopes
+            scope_str: @request.scopes.to_s,
+            server_scopes: @server.scopes,
+            app_scopes: application_scopes,
+            grant_type: Doorkeeper::OAuth::CLIENT_CREDENTIALS
           )
         end
       end

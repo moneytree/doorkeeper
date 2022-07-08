@@ -114,11 +114,13 @@ module Doorkeeper
       #   and false in other cases
       #
       def scopes_match?(token_scopes, param_scopes, app_scopes)
-        (!token_scopes.present? && !param_scopes.present?) ||
-          Doorkeeper::OAuth::Helpers::ScopeChecker.match?(
-            token_scopes.to_s,
-            param_scopes,
-            app_scopes
+        return true if token_scopes.empty? && param_scopes.empty?
+
+        (token_scopes.sort == param_scopes.sort) &&
+          Doorkeeper::OAuth::Helpers::ScopeChecker.valid?(
+            scope_str: param_scopes.to_s,
+            server_scopes: Doorkeeper.configuration.scopes,
+            app_scopes: app_scopes
           )
       end
 
