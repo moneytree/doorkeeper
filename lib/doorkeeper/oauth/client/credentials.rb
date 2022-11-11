@@ -1,7 +1,7 @@
 module Doorkeeper
   module OAuth
     class Client
-      class Credentials < Struct.new(:uid, :secret)
+      Credentials = Struct.new(:uid, :secret) do
         class << self
           def from_request(request, *credentials_methods)
             credentials_methods.inject(nil) do |credentials, method|
@@ -18,7 +18,7 @@ module Doorkeeper
           def from_basic(request)
             authorization = request.authorization
             if authorization.present? && authorization =~ /^Basic (.*)/m
-              Base64.decode64($1).split(/:/, 2)
+              Base64.decode64(Regexp.last_match(1)).split(/:/, 2)
             end
           end
         end
