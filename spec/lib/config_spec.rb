@@ -331,4 +331,21 @@ describe Doorkeeper, 'configuration' do
       it { expect(Doorkeeper.configuration.base_controller).to eq('ApplicationController') }
     end
   end
+
+  describe 'base_metal_controller' do
+    context 'default' do
+      it { expect(Doorkeeper.configuration.base_metal_controller).to eq('ActionController::Metal') }
+    end
+
+    context 'custom' do
+      before do
+        Doorkeeper.configure do
+          orm DOORKEEPER_ORM
+          base_metal_controller 'ApplicationController'
+        end
+      end
+
+      it { expect(Doorkeeper.configuration.base_metal_controller).to eq('ApplicationController') }
+    end
+  end
 end
