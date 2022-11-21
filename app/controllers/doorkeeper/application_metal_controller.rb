@@ -1,5 +1,5 @@
 module Doorkeeper
-  class ApplicationMetalController < ActionController::Metal
+  class ApplicationMetalController < Doorkeeper.configuration.base_metal_controller.constantize
     MODULES = [
       ActionController::Instrumentation,
       AbstractController::Rendering,
