@@ -9,29 +9,36 @@ module Doorkeeper
       handle_token_exception e
     end
 
-    # OAuth 2.0 Token Revocation - http://tools.ietf.org/html/rfc7009
-    def revoke
-      # The authorization server, if applicable, first authenticates the client
-      # and checks its ownership of the provided token.
-      #
-      # Doorkeeper does not use the token_type_hint logic described in the
-      # RFC 7009 due to the refresh token implementation that is a field in
-      # the access token model.
-      if authorized?
+     # OAuth 2.0 Token Revocation - https://datatracker.ietf.org/doc/html/rfc7009
+     def revoke
+      # The authorization server responds with HTTP status code 200 if the client
+      # submitted an invalid token or the token has been revoked successfully.
+      if token.blank?
+        render json: {}, status: 200
+      # The authorization server validates [...] and whether the token
+      # was issued to the client making the revocation request. If this
+      # validation fails, the request is refused and the client is informed
+      # of the error by the authorization server as described below.
+      elsif authorized?
         revoke_token
+        render json: {}, status: 200
+      else
+        render json: revocation_error_response, status: :forbidden
       end
-
-      # The authorization server responds with HTTP status code 200 if the token
-      # has been revoked successfully or if the client submitted an invalid
-      # token
-      render json: {}, status: 200
     end
 
     private
 
     # OAuth 2.0 Section 2.1 defines two client types, "public" & "confidential".
-    # Public clients (as per RFC 7009) do not require authentication whereas
-    # confidential clients must be authenticated for their token revocation.
+    #
+    # RFC7009
+    # Section 5. Security Considerations
+    # A malicious client may attempt to guess valid tokens on this endpoint
+    # by making revocation requests against potential token strings.
+    # According to this specification, a client's request must contain a
+    # valid client_id, in the case of a public client, or valid client
+    # credentials, in the case of a confidential client. The token being
+    # revoked must also belong to the requesting client.
     #
     # Once a confidential client is authenticated, it must be authorized to
     # revoke the provided access or refresh token. This ensures one client
@@ -43,31 +50,35 @@ module Doorkeeper
     # types, they set the application_id as null (since the claim cannot be
     # verified).
     #
-    # https://tools.ietf.org/html/rfc6749#section-2.1
-    # https://tools.ietf.org/html/rfc7009
+    # https://datatracker.ietf.org/doc/html/rfc6749#section-2.1
+    # https://datatracker.ietf.org/doc/html/rfc7009
     def authorized?
-      if token.present?
-        # Client is confidential, therefore client authentication & authorization
-        # is required
-        if token.application_id?
-          # We authorize client by checking token's application
-          server.client && server.client.application == token.application
-        else
-          # Client is public, authentication unnecessary
-          true
-        end
+      # Token belongs to specific client, so we need to check if
+      # authenticated client could access it.
+      if token.application_id? && token.application.confidential?
+        # We authorize client by checking token's application
+        server.client && server.client.application == token.application
+      else
+        # Token was issued without client, authorization unnecessary
+        true
       end
     end
 
     def revoke_token
-      if token.accessible?
-        token.revoke
-      end
+      # The authorization server responds with HTTP status code 200 if the token
+      # has been revoked successfully or if the client submitted an invalid
+      # token
+      token.revoke if token&.accessible?
     end
 
     def token
-      @token ||= Doorkeeper.configuration.access_token_model.by_token(request.POST['token']) ||
-      Doorkeeper.configuration.access_token_model.by_refresh_token(request.POST['token'])
+      @token ||=
+        if params[:token_type_hint] == 'refresh_token'
+          Doorkeeper.configuration.access_token_model.by_refresh_token(params['token'])
+        else
+          Doorkeeper.configuration.access_token_model.by_token(params['token']) ||
+          Doorkeeper.configuration.access_token_model.by_refresh_token(params['token'])
+        end
     end
 
     def strategy
@@ -76,6 +87,12 @@ module Doorkeeper
 
     def authorize_response
       @authorize_response ||= strategy.authorize
+    end
+
+    def revocation_error_response
+      error_description = I18n.t(:unauthorized, scope: %i[doorkeeper errors messages revoke])
+
+      { error: :unauthorized_client, error_description: error_description }
     end
   end
 end
