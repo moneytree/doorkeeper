@@ -3,7 +3,7 @@ module Doorkeeper
     class ClientCredentialsRequest < BaseRequest
       class Creator
         def call(client, scopes, attributes = {})
-          AccessToken.find_or_create_for(
+          Doorkeeper.configuration.access_token_model.find_or_create_for(
             client, nil, scopes, attributes[:expires_in],
             attributes[:use_refresh_token])
         end

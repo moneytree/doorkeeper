@@ -16,7 +16,7 @@ module Doorkeeper
       def self.initialize_application_owner!
         require 'doorkeeper/models/concerns/ownership'
 
-        Doorkeeper::Application.send :include, Doorkeeper::Models::Ownership
+        Doorkeeper.configuration.application_model.send :include, Doorkeeper::Models::Ownership
       end
     end
   end
