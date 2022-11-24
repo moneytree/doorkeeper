@@ -4,7 +4,7 @@ module Doorkeeper
 
     include ApplicationMixin
 
-    has_many :authorized_tokens, -> { where(revoked_at: nil) }, class_name: 'AccessToken'
+    has_many :authorized_tokens, -> { where(revoked_at: nil) }, class_name: Doorkeeper.configuration.access_token_class
     has_many :authorized_applications, through: :authorized_tokens, source: :application
 
     # Returns Applications associated with active (not revoked) Access Tokens
@@ -17,7 +17,7 @@ module Doorkeeper
     #   Applications authorized for the Resource Owner
     #
     def self.authorized_for(resource_owner)
-      resource_access_tokens = AccessToken.active_for(resource_owner)
+      resource_access_tokens = Doorkeeper.configuration.access_token_model.active_for(resource_owner)
       where(id: resource_access_tokens.select(:application_id).distinct)
     end
   end

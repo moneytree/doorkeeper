@@ -57,7 +57,7 @@ module Doorkeeper
         # if either side (server or client) request pkce, check the verifier against the DB
         return true unless grant.uses_pkce? || code_verifier
         if grant.code_challenge_method == 'S256'
-          grant.code_challenge == AccessGrant.generate_code_challenge(code_verifier)
+          grant.code_challenge == Doorkeeper.configuration.access_grant_model.generate_code_challenge(code_verifier)
         elsif grant.code_challenge_method == 'plain'
           grant.code_challenge == code_verifier
         else

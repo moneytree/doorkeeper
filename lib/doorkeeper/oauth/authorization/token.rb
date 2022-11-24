@@ -18,7 +18,7 @@ module Doorkeeper
         end
 
         def issue_token
-          @token ||= AccessToken.find_or_create_for(
+          @token ||= Doorkeeper.configuration.access_token_model.find_or_create_for(
             pre_auth.client,
             resource_owner.id,
             pre_auth.scopes,

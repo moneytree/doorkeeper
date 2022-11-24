@@ -11,7 +11,7 @@ module Doorkeeper
 
     included do
       belongs_to_options = {
-        class_name: 'Doorkeeper::Application',
+        class_name: Doorkeeper.configuration.application_class,
         inverse_of: :access_grants
       }
       if defined?(ActiveRecord::Base) && ActiveRecord::VERSION::MAJOR >= 5

@@ -10,7 +10,7 @@ module Doorkeeper
         end
 
         def issue_token
-          @token ||= AccessGrant.create!(
+          @token ||= Doorkeeper.configuration.access_grant_model.create!(
             application_id: pre_auth.client.id,
             resource_owner_id: resource_owner.id,
             expires_in: configuration.authorization_code_expires_in,
