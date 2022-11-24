@@ -114,6 +114,14 @@ doorkeeper.
       def reuse_access_token
         @config.instance_variable_set(:@reuse_access_token, true)
       end
+
+      # The controller Doorkeeper::ApplicationMetalController inherits from.
+      # Defaults to ActionController::Metal.
+      #
+      # @param base_metal_controller [String] the name of the base controller
+      def base_metal_controller(base_metal_controller)
+        @config.instance_variable_set('@base_metal_controller', base_metal_controller)
+      end
     end
 
     module Option
@@ -247,6 +255,8 @@ doorkeeper.
     # @param base_controller [String] the name of the base controller
     option :base_controller,
            default: 'ActionController::Base'
+    option :base_metal_controller,
+           default: 'ActionController::Metal'
 
     attr_reader :reuse_access_token
 
