@@ -1,16 +1,26 @@
 # Doorkeeper - awesome OAuth2 provider for your Rails app.
 
+[![Gem Version](https://badge.fury.io/rb/doorkeeper.svg)](https://rubygems.org/gems/doorkeeper)
 [![Build Status](https://travis-ci.org/doorkeeper-gem/doorkeeper.svg?branch=master)](https://travis-ci.org/doorkeeper-gem/doorkeeper)
 [![Dependency Status](https://gemnasium.com/doorkeeper-gem/doorkeeper.svg?travis)](https://gemnasium.com/doorkeeper-gem/doorkeeper)
 [![Code Climate](https://codeclimate.com/github/doorkeeper-gem/doorkeeper.svg)](https://codeclimate.com/github/doorkeeper-gem/doorkeeper)
-[![Gem Version](https://badge.fury.io/rb/doorkeeper.svg)](https://rubygems.org/gems/doorkeeper)
+[![Coverage Status](https://coveralls.io/repos/github/doorkeeper-gem/doorkeeper/badge.svg?branch=master)](https://coveralls.io/github/doorkeeper-gem/doorkeeper?branch=master)
 [![Security](https://hakiri.io/github/doorkeeper-gem/doorkeeper/master.svg)](https://hakiri.io/github/doorkeeper-gem/doorkeeper/master)
 
 Doorkeeper is a gem that makes it easy to introduce OAuth 2 provider
 functionality to your Rails or Grape application.
 
-[PR 567]: https://github.com/doorkeeper-gem/doorkeeper/pull/567
+Supported features:
 
+- [The OAuth 2.0 Authorization Framework](https://tools.ietf.org/html/rfc6749)
+  - [Authorization Code Flow](http://tools.ietf.org/html/draft-ietf-oauth-v2-22#section-4.1)
+  - [Access Token Scopes](http://tools.ietf.org/html/draft-ietf-oauth-v2-22#section-3.3)
+  - [Refresh token](http://tools.ietf.org/html/draft-ietf-oauth-v2-22#section-1.5)
+  - [Implicit grant](http://tools.ietf.org/html/draft-ietf-oauth-v2-22#section-4.2)
+  - [Resource Owner Password Credentials](http://tools.ietf.org/html/draft-ietf-oauth-v2-22#section-4.3)
+  - [Client Credentials](http://tools.ietf.org/html/draft-ietf-oauth-v2-22#section-4.4)
+- [OAuth 2.0 Token Revocation](http://tools.ietf.org/html/rfc7009)
+- [OAuth 2.0 Token Introspection](https://tools.ietf.org/html/rfc7662)
 
 ## Documentation valid for `master` branch
 
@@ -29,8 +39,10 @@ https://github.com/doorkeeper-gem/doorkeeper/releases
 
 - [Installation](#installation)
 - [Configuration](#configuration)
-  - [Active Record](#active-record)
-  - [Other ORMs](#other-orms)
+  - [ORM](#orm)
+    - [Active Record](#active-record)
+    - [MongoDB](#mongodb)
+    - [Sequel](#sequel)
   - [Routes](#routes)
   - [Authenticating](#authenticating)
   - [Internationalization (I18n)](#internationalization-i18n)
@@ -71,7 +83,9 @@ This will install the doorkeeper initializer into `config/initializers/doorkeepe
 
 ## Configuration
 
-### Active Record
+### ORM
+
+#### Active Record
 
 By default doorkeeper is configured to use active record, so to start you have
 to generate the migration tables:
@@ -86,18 +100,31 @@ for each table that includes a `resource_owner_id` column:
 add_foreign_key :table_name, :users, column: :resource_owner_id
 ```
 
+Remember to add associations to your model so the related records are deleted.
+If you don't do this an `ActiveRecord::InvalidForeignKey`-error will be raised
+when you try to destroy a model with related access grants or access tokens.
+
+```ruby
+class User < ApplicationRecord
+  has_many :access_grants, class_name: "Doorkeeper::AccessGrant", foreign_key: :resource_owner_id, dependent: :delete_all # or :destroy if you need callbacks
+  has_many :access_tokens, class_name: "Doorkeeper::AccessToken", foreign_key: :resource_owner_id, dependent: :delete_all # or :destroy if you need callbacks
+end
+```
+
 Then run migrations:
 
 ```sh
 rake db:migrate
 ```
 
-### Other ORMs
+#### MongoDB
 
 See [doorkeeper-mongodb project] for Mongoid and MongoMapper support. Follow along
 the implementation in that repository to extend doorkeeper with other ORMs.
 
 [doorkeeper-mongodb project]: https://github.com/doorkeeper-gem/doorkeeper-mongodb
+
+#### Sequel
 
 If you are using [Sequel gem] then you can add [doorkeeper-sequel extension] to your project.
 Follow configuration instructions for setting up the necessary Doorkeeper ORM.
@@ -119,12 +146,13 @@ end
 
 This will mount following routes:
 
-    GET       /oauth/authorize/:code
+    GET       /oauth/authorize/native?code
     GET       /oauth/authorize
     POST      /oauth/authorize
     DELETE    /oauth/authorize
     POST      /oauth/token
     POST      /oauth/revoke
+    POST      /oauth/introspect
     resources /oauth/applications
     GET       /oauth/authorized_applications
     DELETE    /oauth/authorized_applications/:id
@@ -200,8 +228,8 @@ module API
         doorkeeper_authorize!
       end
 
-      route_setting :scopes, ['user:email']
-      get :emails do
+      # route_setting :scopes, ['user:email'] - for old versions of Grape
+      get :emails, scopes: [:user, :write] do
         [{'email' => current_user.email}]
       end
 

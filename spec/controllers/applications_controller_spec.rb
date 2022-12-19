@@ -19,13 +19,24 @@ module Doorkeeper
           post :create, doorkeeper_application: {
             name: 'Example',
             redirect_uri: 'https://example.com' }
-        end.to_not change { Doorkeeper::Application.count }
+        end.not_to change { Doorkeeper::Application.count }
       end
     end
 
     context 'when admin is authenticated' do
+      render_views
+
       before do
-        allow(Doorkeeper.configuration).to receive(:authenticate_admin).and_return(->(arg) { true })
+        allow(Doorkeeper.configuration).to receive(:authenticate_admin).and_return(->(*) { true })
+      end
+
+      it 'sorts applications by created_at' do
+        first_application = FactoryBot.create(:application)
+        second_application = FactoryBot.create(:application)
+        expect(Doorkeeper::Application).to receive(:ordered_by).and_call_original
+        get :index
+        expect(response.body).to have_selector("tbody tr:first-child#application_#{first_application.id}")
+        expect(response.body).to have_selector("tbody tr:last-child#application_#{second_application.id}")
       end
 
       it 'creates application' do
@@ -38,7 +49,7 @@ module Doorkeeper
       end
 
       it 'does not allow mass assignment of uid or secret' do
-        application = FactoryGirl.create(:application)
+        application = FactoryBot.create(:application)
         put :update, id: application.id, doorkeeper_application: {
           uid: '1A2B3C4D',
           secret: '1A2B3C4D' }
@@ -47,7 +58,7 @@ module Doorkeeper
       end
 
       it 'updates application' do
-        application = FactoryGirl.create(:application)
+        application = FactoryBot.create(:application)
         put :update, id: application.id, doorkeeper_application: {
           name: 'Example',
           redirect_uri: 'https://example.com' }
