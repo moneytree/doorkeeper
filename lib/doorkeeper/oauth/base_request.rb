@@ -33,7 +33,7 @@ module Doorkeeper
       end
 
       def find_or_create_access_token(client, resource_owner_id, scopes, server)
-        @access_token = AccessToken.find_or_create_for(
+        @access_token = Doorkeeper.configuration.access_token_model.find_or_create_for(
           client,
           resource_owner_id,
           scopes,

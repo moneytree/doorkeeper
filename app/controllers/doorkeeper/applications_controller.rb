@@ -6,26 +6,26 @@ module Doorkeeper
     before_action :set_application, only: [:show, :edit, :update, :destroy]
 
     def index
-      @applications = if Application.respond_to?(:ordered_by)
-                        Application.ordered_by(:created_at)
+      @applications = if Doorkeeper.configuration.application_model.respond_to?(:ordered_by)
+                        Doorkeeper.configuration.application_model.ordered_by(:created_at)
                       else
                         ActiveSupport::Deprecation.warn <<-MSG.squish
                           Doorkeeper #{Doorkeeper.configuration.orm} extension must implement #ordered_by
                           method for it's models as it will be used by default in Doorkeeper 5.
                         MSG
 
-                        Application.all
+                        Doorkeeper.configuration.application_model.all
                       end
     end
 
     def show; end
 
     def new
-      @application = Application.new
+      @application = Doorkeeper.configuration.application_model.new
     end
 
     def create
-      @application = Application.new(application_params)
+      @application = Doorkeeper.configuration.application_model.new(application_params)
       if @application.save
         flash[:notice] = I18n.t(:notice, scope: [:doorkeeper, :flash, :applications, :create])
         redirect_to oauth_application_url(@application)
@@ -53,7 +53,7 @@ module Doorkeeper
     private
 
     def set_application
-      @application = Application.find(params[:id])
+      @application = Doorkeeper.configuration.application_model.find(params[:id])
     end
 
     def application_params

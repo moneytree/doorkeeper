@@ -257,8 +257,26 @@ doorkeeper.
            default: 'ActionController::Base'
     option :base_metal_controller,
            default: 'ActionController::Metal'
+    option :access_token_class,
+           default: 'Doorkeeper::AccessToken'
+    option :access_grant_class,
+           default: 'Doorkeeper::AccessGrant'
+    option :application_class,
+           default: 'Doorkeeper::Application'
 
     attr_reader :reuse_access_token
+
+    def access_token_model
+      @access_token_model ||= Doorkeeper.configuration.access_token_class.constantize
+    end
+
+    def access_grant_model
+      @access_grant_model ||= Doorkeeper.configuration.access_grant_class.constantize
+    end
+
+    def application_model
+      @application_model ||= Doorkeeper.configuration.application_class.constantize
+    end
 
     def refresh_token_enabled?
       @refresh_token_enabled ||= false

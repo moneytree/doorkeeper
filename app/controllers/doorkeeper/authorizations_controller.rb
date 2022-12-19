@@ -27,7 +27,7 @@ module Doorkeeper
     private
 
     def matching_token?
-      AccessToken.matching_token_for pre_auth.client,
+      Doorkeeper.configuration.access_token_model.matching_token_for pre_auth.client,
                                      current_resource_owner.id,
                                      pre_auth.scopes
     end

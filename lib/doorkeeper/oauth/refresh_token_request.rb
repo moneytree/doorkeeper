@@ -20,7 +20,7 @@ module Doorkeeper
         @refresh_token_parameter = parameters[:refresh_token]
 
         if credentials
-          @client = Application.by_uid_and_secret credentials.uid,
+          @client = Doorkeeper.configuration.application_model.by_uid_and_secret credentials.uid,
                                                   credentials.secret
         end
       end
@@ -39,7 +39,7 @@ module Doorkeeper
       end
 
       def refresh_token_revoked_on_use?
-        Doorkeeper::AccessToken.refresh_token_revoked_on_use?
+        Doorkeeper.configuration.access_token_model.refresh_token_revoked_on_use?
       end
 
       def default_scopes
@@ -47,7 +47,7 @@ module Doorkeeper
       end
 
       def create_access_token
-        @access_token = AccessToken.create!(access_token_attributes)
+        @access_token = Doorkeeper.configuration.access_token_model.create!(access_token_attributes)
       end
 
       def access_token_attributes

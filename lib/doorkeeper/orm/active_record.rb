@@ -11,19 +11,27 @@ module Doorkeeper
           require 'doorkeeper/orm/active_record/application'
 
           if Doorkeeper.configuration.active_record_options[:establish_connection]
-            [Doorkeeper::AccessGrant, Doorkeeper::AccessToken, Doorkeeper::Application].each do |model|
+            Doorkeeper::Orm::ActiveRecord.models.each do |model|
               options = Doorkeeper.configuration.active_record_options[:establish_connection]
               model.establish_connection(options)
             end
           end
         end
       end
+      
+      def self.models
+        [
+          Doorkeeper.config.access_grant_model,
+          Doorkeeper.config.access_token_model,
+          Doorkeeper.config.application_model,
+        ]
+      end
 
       def self.initialize_application_owner!
         lazy_load do
           require 'doorkeeper/models/concerns/ownership'
 
-          Doorkeeper::Application.send :include, Doorkeeper::Models::Ownership
+          Doorkeeper.configuration.application_model.send :include, Doorkeeper::Models::Ownership
         end
       end
 
