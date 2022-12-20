@@ -1,22 +1,34 @@
+require 'active_support/lazy_load_hooks'
+
 module Doorkeeper
   module Orm
     module ActiveRecord
       def self.initialize_models!
-        require 'doorkeeper/orm/active_record/access_grant'
-        require 'doorkeeper/orm/active_record/access_token'
-        require 'doorkeeper/orm/active_record/application'
+        lazy_load do
+          require 'doorkeeper/orm/active_record/base_record'
+          require 'doorkeeper/orm/active_record/access_grant'
+          require 'doorkeeper/orm/active_record/access_token'
+          require 'doorkeeper/orm/active_record/application'
 
-        if Doorkeeper.configuration.active_record_options[:establish_connection]
-          Doorkeeper::Orm::ActiveRecord.models.each do |model|
-            model.send :establish_connection, Doorkeeper.configuration.active_record_options[:establish_connection]
+          if Doorkeeper.configuration.active_record_options[:establish_connection]
+            Doorkeeper::Orm::ActiveRecord.models.each do |model|
+              options = Doorkeeper.configuration.active_record_options[:establish_connection]
+              model.establish_connection(options)
+            end
           end
         end
       end
 
       def self.initialize_application_owner!
-        require 'doorkeeper/models/concerns/ownership'
+        lazy_load do
+          require 'doorkeeper/models/concerns/ownership'
 
-        Doorkeeper.configuration.application_model.send :include, Doorkeeper::Models::Ownership
+          Doorkeeper.configuration.application_model.send :include, Doorkeeper::Models::Ownership
+        end
+      end
+
+      def self.lazy_load(&block)
+        ActiveSupport.on_load(:active_record, {}, &block)
       end
 
       def self.models

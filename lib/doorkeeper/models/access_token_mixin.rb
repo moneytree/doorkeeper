@@ -68,11 +68,11 @@ module Doorkeeper
       # @param resource_owner [ActiveRecord::Base]
       #   instance of the Resource Owner model
       #
-      def revoke_all_for(application_id, resource_owner)
+      def revoke_all_for(application_id, resource_owner, clock = Time)
         where(application_id: application_id,
               resource_owner_id: resource_owner.id,
               revoked_at: nil).
-          each(&:revoke)
+          update_all(revoked_at: clock.now.utc)
       end
 
       # Looking for not expired Access Token with a matching set of scopes
@@ -168,7 +168,7 @@ module Doorkeeper
       #   nil if nothing was found
       #
       def last_authorized_token_for(application_id, resource_owner_id)
-        send(order_method, created_at_desc).
+        ordered_by(:created_at, :desc).
           find_by(application_id: application_id,
                   resource_owner_id: resource_owner_id,
                   revoked_at: nil)
@@ -247,7 +247,11 @@ module Doorkeeper
     def generate_token
       self.created_at ||= Time.now.utc
 
-      generator = Doorkeeper.configuration.access_token_generator.constantize
+      generator = token_generator
+      unless generator.respond_to?(:generate)
+        raise Errors::UnableToGenerateToken, "#{generator} does not respond to `.generate`."
+      end
+
       self.token = generator.generate(
         resource_owner_id: resource_owner_id,
         scopes: scopes,
@@ -255,10 +259,13 @@ module Doorkeeper
         expires_in: expires_in,
         created_at: created_at
       )
-    rescue NoMethodError
-      raise Errors::UnableToGenerateToken, "#{generator} does not respond to `.generate`."
+    end
+
+    def token_generator
+      generator_name = Doorkeeper.configuration.access_token_generator
+      generator_name.constantize
     rescue NameError
-      raise Errors::TokenGeneratorNotFound, "#{generator} not found"
+      raise Errors::TokenGeneratorNotFound, "#{generator_name} not found"
     end
   end
 end

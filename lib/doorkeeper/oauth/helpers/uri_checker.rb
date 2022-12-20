@@ -3,6 +3,13 @@ module Doorkeeper
     module Helpers
       module URIChecker
         def self.valid?(url)
+          # since preauthorization is allowing native uri https://github.com/mt-max/doorkeeper/blob/current/lib/doorkeeper/oauth/pre_authorization.rb#L65
+          # we should allow it during token exchange as well https://github.com/mt-max/doorkeeper/blob/current/lib/doorkeeper/oauth/authorization_code_request.rb#L55
+          # 
+          # this is how current latest doorkeeper is supporting it
+          # https://github.com/doorkeeper-gem/doorkeeper/blob/2533ab92e9ee337f52bbab2b2201d791a19a7633/lib/doorkeeper/oauth/helpers/uri_checker.rb#L10
+          return true if native_uri?(url)
+
           uri = as_uri(url)
           uri.fragment.nil? && !uri.host.nil? && !uri.scheme.nil?
         rescue URI::InvalidURIError

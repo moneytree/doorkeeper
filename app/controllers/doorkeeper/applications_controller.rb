@@ -6,7 +6,16 @@ module Doorkeeper
     before_action :set_application, only: [:show, :edit, :update, :destroy]
 
     def index
-      @applications = Doorkeeper.configuration.application_model.all
+      @applications = if Doorkeeper.configuration.application_model.respond_to?(:ordered_by)
+        Doorkeeper.configuration.application_model.ordered_by(:created_at)
+                      else
+                        ActiveSupport::Deprecation.warn <<-MSG.squish
+                          Doorkeeper #{Doorkeeper.configuration.orm} extension must implement #ordered_by
+                          method for it's models as it will be used by default in Doorkeeper 5.
+                        MSG
+
+                        Doorkeeper.configuration.application_model.all
+                      end
     end
 
     def show; end

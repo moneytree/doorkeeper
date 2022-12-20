@@ -4,6 +4,7 @@ module Doorkeeper
       validate :attributes,   error: :invalid_request
       validate :client,       error: :invalid_client
       validate :grant,        error: :invalid_grant
+      # @see https://tools.ietf.org/html/rfc6749#section-5.2
       validate :redirect_uri, error: :invalid_grant
       validate :code_verifier,error: :invalid_grant
 
@@ -30,6 +31,7 @@ module Doorkeeper
                                       grant.scopes,
                                       server)
         end
+        super
       end
 
       def validate_attributes
@@ -50,7 +52,10 @@ module Doorkeeper
       end
 
       def validate_redirect_uri
-        grant.redirect_uri == redirect_uri
+        Helpers::URIChecker.valid_for_authorization?(
+          redirect_uri,
+          grant.redirect_uri
+        )
       end
 
       def validate_code_verifier
