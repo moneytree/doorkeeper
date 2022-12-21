@@ -4,7 +4,9 @@ User-visible changes worth mentioning.
 
 ## master
 
-Replace this text with you changelog entry. Look at the examples below.
+## 4.3.2
+
+- [#1053] Support authorizing with query params in the request `redirect_uri` if explicitly present in app's `Application#redirect_uri`
 
 ## 4.3.1
 
@@ -39,7 +41,7 @@ Replace this text with you changelog entry. Look at the examples below.
 - [#1023] Update Ruby versions and test against 2.5.0 on Travis CI.
 - [#1024] Migrate from FactoryGirl to FactoryBot.
 - [#1025] Improve documentation for adding foreign keys
-- [#1028] Make it possible to have composit strategy names.
+- [#1028] Make it possible to have composite strategy names.
 
 ## 4.2.6
 
