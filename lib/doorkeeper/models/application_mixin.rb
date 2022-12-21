@@ -10,6 +10,9 @@ module Doorkeeper
       # Returns an instance of the Doorkeeper::Application with
       # specific UID and secret.
       #
+      # Public/Non-confidential applications will only find by uid if secret is
+      # blank.
+      #
       # @param uid [#to_s] UID (any object that responds to `#to_s`)
       # @param secret [#to_s] secret (any object that responds to `#to_s`)
       #
@@ -21,7 +24,6 @@ module Doorkeeper
         return unless app
         return app if secret.blank? && !app.confidential?
         return unless app.secret == secret
-
         app
       end
 
