@@ -4,6 +4,18 @@ User-visible changes worth mentioning.
 
 ## master
 
+Replace this text with you changelog entry. Look at the examples below.
+
+## 4.3.1
+
+- Remove `BaseRecord` and introduce additional concern for ordering methods to fix
+  braking changes for Doorkeeper models.
+- [#1032] Refactor BaseRequest callbacks into configurable lambdas
+- [#1040] Clear mixins from ActiveRecord DSL and save only overridable API. It
+  allows to use this mixins in Doorkeeper ORM extensions with minimum code boilerplate.
+
+## 4.3.0
+
 - [#976] Fix to invalidate the second redirect URI when the first URI is the native URI
 - [#1035] Allow `Application#redirect_uri=` to handle array of URIs.
 - [#1036] Allow to forbid Application redirect URI's with specific rules.
@@ -22,13 +34,16 @@ User-visible changes worth mentioning.
 - [#1019] Remove translation not in use: `invalid_resource_owner`.
 - Use Ruby 2 hash style syntax (min required Ruby version = 2.1)
 - [#948] Make Scopes.<=> work with any "other" value.
-- [#970] Escape certain attributes in authorization forms.
 - [#974] Redirect URI is checked without query params within AuthorizationCodeRequest.
 - [#1004] More explicit help text for `native_redirect_uri`.
 - [#1023] Update Ruby versions and test against 2.5.0 on Travis CI.
 - [#1024] Migrate from FactoryGirl to FactoryBot.
 - [#1025] Improve documentation for adding foreign keys
 - [#1028] Make it possible to have composit strategy names.
+
+## 4.2.6
+
+- [#970] Escape certain attributes in authorization forms.
 
 ## 4.2.5
 
