@@ -9,6 +9,12 @@ module Doorkeeper
     include Models::Orderable
     include Models::Scopes
 
+    included do
+      def uses_pkce?
+        code_challenge.present?
+      end
+    end
+
     module ClassMethods
       # Searches for Doorkeeper::AccessGrant record with the
       # specific token value.
