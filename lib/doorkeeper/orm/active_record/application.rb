@@ -5,8 +5,8 @@ module Doorkeeper
     include ApplicationMixin
     include ActiveModel::MassAssignmentSecurity if defined?(::ProtectedAttributes)
 
-    has_many :access_grants, dependent: :delete_all, class_name: 'Doorkeeper::AccessGrant'
-    has_many :access_tokens, dependent: :delete_all, class_name: 'Doorkeeper::AccessToken'
+    has_many :access_grants, dependent: :delete_all, class_name: Doorkeeper.configuration.access_grant_class
+    has_many :access_tokens, dependent: :delete_all, class_name: Doorkeeper.configuration.access_token_class
 
     validates :name, :secret, :uid, presence: true
     validates :uid, uniqueness: true
