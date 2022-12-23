@@ -6,25 +6,10 @@ module Doorkeeper
     include Models::Expirable
     include Models::Revocable
     include Models::Accessible
+    include Models::Orderable
     include Models::Scopes
-    include ActiveModel::MassAssignmentSecurity if defined?(::ProtectedAttributes)
 
     included do
-      belongs_to_options = {
-        class_name: Doorkeeper.configuration.application_class,
-        inverse_of: :access_grants
-      }
-      if defined?(ActiveRecord::Base) && ActiveRecord::VERSION::MAJOR >= 5
-        belongs_to_options[:optional] = true
-      end
-
-      belongs_to :application, belongs_to_options
-
-      validates :resource_owner_id, :application_id, :token, :expires_in, :redirect_uri, presence: true
-      validates :token, uniqueness: true
-
-      before_validation :generate_token, on: :create
-
       def uses_pkce?
         code_challenge.present?
       end
@@ -85,16 +70,6 @@ module Doorkeeper
         padded_result = Base64.urlsafe_encode64(Digest::SHA256.digest(code_verifier))
         padded_result.split('=')[0] # Remove any trailing '='
       end
-    end
-
-    private
-
-    # Generates token value with UniqueToken class.
-    #
-    # @return [String] token value
-    #
-    def generate_token
-      self.token = UniqueToken.generate
     end
   end
 end

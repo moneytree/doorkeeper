@@ -5,8 +5,8 @@ require "doorkeeper/version"
 Gem::Specification.new do |s|
   s.name        = "doorkeeper"
   s.version     = Doorkeeper.gem_version
-  s.authors     = ["Felipe Elias Philipp", "Tute Costa", "Jon Moss"]
-  s.email       = %w(me@jonathanmoss.me)
+  s.authors     = ["Felipe Elias Philipp", "Tute Costa", "Jon Moss", "Nikita Bulai"]
+  s.email       = %w(bulaj.nikita@gmail.com)
   s.homepage    = "https://github.com/doorkeeper-gem/doorkeeper"
   s.summary     = "OAuth 2 provider for Rails and Grape"
   s.description = "Doorkeeper is an OAuth 2 provider for Rails and Grape."
@@ -27,4 +27,6 @@ Gem::Specification.new do |s|
   s.add_development_dependency "generator_spec", "~> 0.9.3"
   s.add_development_dependency "rake", ">= 11.3.0"
   s.add_development_dependency "rspec-rails"
+
+  s.post_install_message = Doorkeeper::CVE_2018_1000211_WARNING
 end
