@@ -4,6 +4,19 @@ User-visible changes worth mentioning.
 
 ## master
 
+## 4.4.3
+- [#1143] Adds a config option opt_out_native_route_change to opt out of the
+  breaking api changed introduced in
+  https://github.com/doorkeeper-gem/doorkeeper/pull/1003
+
+## 4.4.2
+- [#1130] Backport fix for native redirect_uri from 5.x.
+
+## 4.4.1
+
+- [#1127] Backport token type to comply with the RFC6750 specification.
+- [#1125] Backport Quote surround I18n yes/no keys
+
 ## 4.4.0
 
 - [#1120] Backport security fix from 5.x for token revocation when using public clients

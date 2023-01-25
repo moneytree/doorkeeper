@@ -6,7 +6,7 @@ module Doorkeeper
     include ActiveModel::MassAssignmentSecurity if defined?(::ProtectedAttributes)
 
     belongs_to_options = {
-      class_name: 'Doorkeeper::Application',
+      class_name: Doorkeeper.configuration.application_class,
       inverse_of: :access_grants
     }
 
