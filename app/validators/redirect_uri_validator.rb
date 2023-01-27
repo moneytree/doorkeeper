@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require 'uri'
+require "uri"
 
 class RedirectUriValidator < ActiveModel::EachValidator
   def self.native_redirect_uri
@@ -9,11 +9,14 @@ class RedirectUriValidator < ActiveModel::EachValidator
 
   def validate_each(record, attribute, value)
     if value.blank?
+      return if Doorkeeper.configuration.allow_blank_redirect_uri?(record)
+
       record.errors.add(attribute, :blank)
     else
       value.split.each do |val|
         uri = ::URI.parse(val)
         next if native_redirect_uri?(uri)
+
         record.errors.add(attribute, :forbidden_uri) if forbidden_uri?(uri)
         record.errors.add(attribute, :fragment_present) unless uri.fragment.nil?
         record.errors.add(attribute, :relative_uri) if uri.scheme.nil? || uri.host.nil?
@@ -36,7 +39,7 @@ class RedirectUriValidator < ActiveModel::EachValidator
 
   def invalid_ssl_uri?(uri)
     forces_ssl = Doorkeeper.configuration.force_ssl_in_redirect_uri
-    non_https = uri.try(:scheme) == 'http'
+    non_https = uri.try(:scheme) == "http"
 
     if forces_ssl.respond_to?(:call)
       forces_ssl.call(uri) && non_https

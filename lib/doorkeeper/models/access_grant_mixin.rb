@@ -9,6 +9,7 @@ module Doorkeeper
     include Models::Revocable
     include Models::Accessible
     include Models::Orderable
+    include Models::SecretStorable
     include Models::Scopes
 
     # never uses pkce, if pkce migrations were not generated
@@ -30,7 +31,7 @@ module Doorkeeper
       #   if there is no record with such token
       #
       def by_token(token)
-        find_by(token: token.to_s)
+        find_by_plaintext_token(:token, token)
       end
 
       # Revokes AccessGrant records that have not been revoked and associated
@@ -85,14 +86,30 @@ module Doorkeeper
 
       # @param code_verifier [#to_s] a one time use value (any object that responds to `#to_s`)
       #
-      # @return [#to_s] An encoded code challenge based on the provided verifier suitable for PKCE validation
+      # @return [#to_s] An encoded code challenge based on the provided verifier
+      # suitable for PKCE validation
+      #
       def generate_code_challenge(code_verifier)
         padded_result = Base64.urlsafe_encode64(Digest::SHA256.digest(code_verifier))
-        padded_result.split('=')[0] # Remove any trailing '='
+        padded_result.split("=")[0] # Remove any trailing '='
       end
 
       def pkce_supported?
         new.pkce_supported?
+      end
+
+      ##
+      # Determines the secret storing transformer
+      # Unless configured otherwise, uses the plain secret strategy
+      def secret_strategy
+        ::Doorkeeper.configuration.token_secret_strategy
+      end
+
+      ##
+      # Determine the fallback storing strategy
+      # Unless configured, there will be no fallback
+      def fallback_secret_strategy
+        ::Doorkeeper.configuration.token_secret_fallback_strategy
       end
     end
   end

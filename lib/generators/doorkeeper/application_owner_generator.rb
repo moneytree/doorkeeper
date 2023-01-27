@@ -1,18 +1,21 @@
 # frozen_string_literal: true
 
-require 'rails/generators'
-require 'rails/generators/active_record'
+require "rails/generators"
+require "rails/generators/active_record"
 
 module Doorkeeper
+  # Generates migration to add reference to owner of the
+  # Doorkeeper application.
+  #
   class ApplicationOwnerGenerator < ::Rails::Generators::Base
     include ::Rails::Generators::Migration
-    source_root File.expand_path('templates', __dir__)
-    desc 'Provide support for client application ownership.'
+    source_root File.expand_path("templates", __dir__)
+    desc "Provide support for client application ownership."
 
     def application_owner
       migration_template(
-        'add_owner_to_application_migration.rb.erb',
-        'db/migrate/add_owner_to_application.rb',
+        "add_owner_to_application_migration.rb.erb",
+        "db/migrate/add_owner_to_application.rb",
         migration_version: migration_version
       )
     end
@@ -24,9 +27,7 @@ module Doorkeeper
     private
 
     def migration_version
-      if ActiveRecord::VERSION::MAJOR >= 5
-        "[#{ActiveRecord::VERSION::MAJOR}.#{ActiveRecord::VERSION::MINOR}]"
-      end
+      "[#{ActiveRecord::VERSION::MAJOR}.#{ActiveRecord::VERSION::MINOR}]"
     end
   end
 end

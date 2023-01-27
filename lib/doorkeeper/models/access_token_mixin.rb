@@ -6,23 +6,25 @@ module Doorkeeper
 
     include OAuth::Helpers
     include Models::Expirable
+    include Models::Reusable
     include Models::Revocable
     include Models::Accessible
     include Models::Orderable
+    include Models::SecretStorable
     include Models::Scopes
 
     module ClassMethods
       # Returns an instance of the Doorkeeper::AccessToken with
-      # specific token value.
+      # specific plain text token value.
       #
       # @param token [#to_s]
-      #   token value (any object that responds to `#to_s`)
+      #   Plain text token value (any object that responds to `#to_s`)
       #
       # @return [Doorkeeper::AccessToken, nil] AccessToken object or nil
       #   if there is no record with such token
       #
       def by_token(token)
-        find_by(token: token.to_s)
+        find_by_plaintext_token(:token, token)
       end
 
       # Returns an instance of the Doorkeeper::AccessToken
@@ -35,7 +37,7 @@ module Doorkeeper
       #   if there is no record with such refresh token
       #
       def by_refresh_token(refresh_token)
-        find_by(refresh_token: refresh_token.to_s)
+        find_by_plaintext_token(:refresh_token, refresh_token)
       end
 
       # Revokes AccessToken records that have not been revoked and associated
@@ -98,9 +100,9 @@ module Doorkeeper
 
         (token_scopes.sort == param_scopes.sort) &&
           Doorkeeper::OAuth::Helpers::ScopeChecker.valid?(
-            param_scopes.to_s,
-            Doorkeeper.configuration.scopes,
-            app_scopes
+            scope_str: param_scopes.to_s,
+            server_scopes: Doorkeeper.configuration.scopes,
+            app_scopes: app_scopes
           )
       end
 
@@ -125,14 +127,14 @@ module Doorkeeper
         if Doorkeeper.configuration.reuse_access_token
           access_token = matching_token_for(application, resource_owner_id, scopes)
 
-          return access_token if access_token && !access_token.expired?
+          return access_token if access_token&.reusable?
         end
 
         create!(
-          application_id:    application.try(:id),
+          application_id: application.try(:id),
           resource_owner_id: resource_owner_id,
-          scopes:            scopes.to_s,
-          expires_in:        expires_in,
+          scopes: scopes.to_s,
+          expires_in: expires_in,
           use_refresh_token: use_refresh_token
         )
       end
@@ -168,6 +170,20 @@ module Doorkeeper
       def last_authorized_token_for(application_id, resource_owner_id)
         authorized_tokens_for(application_id, resource_owner_id).first
       end
+
+      ##
+      # Determines the secret storing transformer
+      # Unless configured otherwise, uses the plain secret strategy
+      def secret_strategy
+        ::Doorkeeper.configuration.token_secret_strategy
+      end
+
+      ##
+      # Determine the fallback storing strategy
+      # Unless configured, there will be no fallback
+      def fallback_secret_strategy
+        ::Doorkeeper.configuration.token_secret_fallback_strategy
+      end
     end
 
     # Access Token type: Bearer.
@@ -175,7 +191,7 @@ module Doorkeeper
     #   The OAuth 2.0 Authorization Framework: Bearer Token Usage
     #
     def token_type
-      'Bearer'
+      "Bearer"
     end
 
     def use_refresh_token?
@@ -188,11 +204,11 @@ module Doorkeeper
     # @return [Hash] hash with token data
     def as_json(_options = {})
       {
-        resource_owner_id:  resource_owner_id,
-        scope:              scopes,
-        expires_in:         expires_in_seconds,
-        application:        { uid: application.try(:uid) },
-        created_at:         created_at.to_i
+        resource_owner_id: resource_owner_id,
+        scope: scopes,
+        expires_in: expires_in_seconds,
+        application: { uid: application.try(:uid) },
+        created_at: created_at.to_i,
       }
     end
 
@@ -219,6 +235,30 @@ module Doorkeeper
       accessible? && includes_scope?(*scopes)
     end
 
+    # We keep a volatile copy of the raw refresh token for initial communication
+    # The stored refresh_token may be mapped and not available in cleartext.
+    def plaintext_refresh_token
+      if secret_strategy.allows_restoring_secrets?
+        secret_strategy.restore_secret(self, :refresh_token)
+      else
+        @raw_refresh_token
+      end
+    end
+
+    # We keep a volatile copy of the raw token for initial communication
+    # The stored refresh_token may be mapped and not available in cleartext.
+    #
+    # Some strategies allow restoring stored secrets (e.g. symmetric encryption)
+    # while hashing strategies do not, so you cannot rely on this value
+    # returning a present value for persisted tokens.
+    def plaintext_token
+      if secret_strategy.allows_restoring_secrets?
+        secret_strategy.restore_secret(self, :token)
+      else
+        @raw_token
+      end
+    end
+
     private
 
     # Generates refresh token with UniqueToken generator.
@@ -226,7 +266,8 @@ module Doorkeeper
     # @return [String] refresh token value
     #
     def generate_refresh_token
-      self.refresh_token = UniqueToken.generate
+      @raw_refresh_token = UniqueToken.generate
+      secret_strategy.store_secret(self, :refresh_token, @raw_refresh_token)
     end
 
     # Generates and sets the token value with the
@@ -242,13 +283,16 @@ module Doorkeeper
     def generate_token
       self.created_at ||= Time.now.utc
 
-      self.token = token_generator.generate(
+      @raw_token = token_generator.generate(
         resource_owner_id: resource_owner_id,
         scopes: scopes,
         application: application,
         expires_in: expires_in,
         created_at: created_at
       )
+
+      secret_strategy.store_secret(self, :token, @raw_token)
+      @raw_token
     end
 
     def token_generator

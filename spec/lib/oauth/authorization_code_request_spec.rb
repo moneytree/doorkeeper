@@ -1,4 +1,6 @@
-require 'spec_helper'
+# frozen_string_literal: true
+
+require "spec_helper"
 
 module Doorkeeper::OAuth
   describe AuthorizationCodeRequest do
@@ -16,11 +18,15 @@ module Doorkeeper::OAuth
     let(:redirect_uri) { client.redirect_uri }
     let(:params) { { redirect_uri: redirect_uri } }
 
+    before do
+      allow(server).to receive(:option_defined?).with(:custom_access_token_expires_in).and_return(true)
+    end
+
     subject do
       AuthorizationCodeRequest.new server, grant, client, params
     end
 
-    it 'issues a new token for the client' do
+    it "issues a new token for the client" do
       expect do
         subject.authorize
       end.to change { client.reload.access_tokens.count }.by(1)
@@ -33,36 +39,36 @@ module Doorkeeper::OAuth
       expect(Doorkeeper::AccessToken.last.scopes).to eq(grant.scopes)
     end
 
-    it 'revokes the grant' do
+    it "revokes the grant" do
       expect { subject.authorize }.to(change { grant.reload.accessible? })
     end
 
-    it 'requires the grant to be accessible' do
+    it "requires the grant to be accessible" do
       grant.revoke
       subject.validate
       expect(subject.error).to eq(:invalid_grant)
     end
 
-    it 'requires the grant' do
+    it "requires the grant" do
       subject.grant = nil
       subject.validate
       expect(subject.error).to eq(:invalid_grant)
     end
 
-    it 'requires the client' do
+    it "requires the client" do
       subject.client = nil
       subject.validate
       expect(subject.error).to eq(:invalid_client)
     end
 
-    it 'requires the redirect_uri' do
+    it "requires the redirect_uri" do
       subject.redirect_uri = nil
       subject.validate
       expect(subject.error).to eq(:invalid_request)
     end
 
     it "matches the redirect_uri with grant's one" do
-      subject.redirect_uri = 'http://other.com'
+      subject.redirect_uri = "http://other.com"
       subject.validate
       expect(subject.error).to eq(:invalid_grant)
     end
@@ -73,7 +79,7 @@ module Doorkeeper::OAuth
       expect(subject.error).to eq(:invalid_grant)
     end
 
-    it 'skips token creation if there is a matching one' do
+    it "skips token creation if there is a matching one reusable" do
       scopes = grant.scopes
 
       Doorkeeper.configure do
@@ -86,6 +92,23 @@ module Doorkeeper::OAuth
                                        resource_owner_id: grant.resource_owner_id, scopes: grant.scopes.to_s)
 
       expect { subject.authorize }.to_not(change { Doorkeeper::AccessToken.count })
+    end
+
+    it "creates token if there is a matching one but non reusable" do
+      scopes = grant.scopes
+
+      Doorkeeper.configure do
+        orm DOORKEEPER_ORM
+        reuse_access_token
+        default_scopes(*scopes)
+      end
+
+      FactoryBot.create(:access_token, application_id: client.id,
+                                       resource_owner_id: grant.resource_owner_id, scopes: grant.scopes.to_s)
+
+      allow_any_instance_of(Doorkeeper::AccessToken).to receive(:reusable?).and_return(false)
+
+      expect { subject.authorize }.to change { Doorkeeper::AccessToken.count }.by(1)
     end
 
     it "calls configured request callback methods" do
@@ -107,7 +130,7 @@ module Doorkeeper::OAuth
     end
 
     context "when redirect_uri is not an URI" do
-      let(:redirect_uri) { '123d#!s' }
+      let(:redirect_uri) { "123d#!s" }
 
       it "responds with invalid_grant" do
         subject.validate
@@ -116,7 +139,7 @@ module Doorkeeper::OAuth
     end
 
     context "when redirect_uri is the native one" do
-      let(:redirect_uri) { 'urn:ietf:wg:oauth:2.0:oob' }
+      let(:redirect_uri) { "urn:ietf:wg:oauth:2.0:oob" }
 
       it "invalidates when redirect_uri of the grant is not native" do
         subject.validate

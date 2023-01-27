@@ -50,7 +50,7 @@ module Doorkeeper
           response_type: response_type,
           scope: scope,
           client_name: client.name,
-          status: I18n.t('doorkeeper.pre_authorization.status')
+          status: I18n.t("doorkeeper.pre_authorization.status"),
         }
       end
 
@@ -77,10 +77,15 @@ module Doorkeeper
         return true if scope.blank?
 
         Helpers::ScopeChecker.valid?(
-          scope,
-          server.scopes,
-          client.application.scopes
+          scope_str: scope,
+          server_scopes: server.scopes,
+          app_scopes: client.application.scopes,
+          grant_type: grant_type
         )
+      end
+
+      def grant_type
+        response_type == "code" ? AUTHORIZATION_CODE : IMPLICIT
       end
 
       def validate_redirect_uri
@@ -93,7 +98,8 @@ module Doorkeeper
       end
 
       def validate_code_challenge_method
-        !code_challenge.present? || (code_challenge_method.present? && code_challenge_method =~ /^plain$|^S256$/)
+        code_challenge.blank? ||
+          (code_challenge_method.present? && code_challenge_method =~ /^plain$|^S256$/)
       end
     end
   end

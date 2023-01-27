@@ -1,9 +1,10 @@
+# frozen_string_literal: true
+
 module Doorkeeper
   class Application < ActiveRecord::Base
-    self.table_name = "#{table_name_prefix}oauth_applications#{table_name_suffix}".to_sym
+    self.table_name = "#{table_name_prefix}oauth_applications#{table_name_suffix}"
 
     include ApplicationMixin
-    include ActiveModel::MassAssignmentSecurity if defined?(::ProtectedAttributes)
 
     has_many :access_grants, dependent: :delete_all, class_name: Doorkeeper.configuration.access_grant_class
     has_many :access_tokens, dependent: :delete_all, class_name: Doorkeeper.configuration.access_token_class
@@ -68,6 +69,20 @@ module Doorkeeper
       end
     end
 
+    # We keep a volatile copy of the raw secret for initial communication
+    # The stored refresh_token may be mapped and not available in cleartext.
+    #
+    # Some strategies allow restoring stored secrets (e.g. symmetric encryption)
+    # while hashing strategies do not, so you cannot rely on this value
+    # returning a present value for persisted tokens.
+    def plaintext_secret
+      if secret_strategy.allows_restoring_secrets?
+        secret_strategy.restore_secret(self, :secret)
+      else
+        @raw_secret
+      end
+    end
+
     private
 
     def generate_uid
@@ -75,12 +90,16 @@ module Doorkeeper
     end
 
     def generate_secret
-      self.secret = UniqueToken.generate if secret.blank?
+      return unless secret.blank?
+
+      @raw_secret = UniqueToken.generate
+      secret_strategy.store_secret(self, :secret, @raw_secret)
     end
 
     def scopes_match_configured
       if scopes.present? &&
-         !ScopeChecker.valid?(scopes.to_s, Doorkeeper.configuration.scopes)
+         !ScopeChecker.valid?(scope_str: scopes.to_s,
+                              server_scopes: Doorkeeper.configuration.scopes)
         errors.add(:scopes, :not_match_configured)
       end
     end

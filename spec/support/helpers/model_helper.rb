@@ -1,10 +1,12 @@
+# frozen_string_literal: true
+
 module ModelHelper
   def client_exists(client_attributes = {})
     @client = FactoryBot.create(:application, client_attributes)
   end
 
   def create_resource_owner
-    @resource_owner = User.create!(name: 'Joe', password: 'sekret')
+    @resource_owner = User.create!(name: "Joe", password: "sekret")
   end
 
   def authorization_code_exists(options = {})

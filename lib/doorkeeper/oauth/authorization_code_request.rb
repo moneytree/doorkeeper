@@ -43,17 +43,19 @@ module Doorkeeper
       end
 
       def validate_attributes
-        return false if grant && grant.uses_pkce? && code_verifier.blank?
+        return false if grant&.uses_pkce? && code_verifier.blank?
         return false if grant && !grant.pkce_supported? && !code_verifier.blank?
+
         redirect_uri.present?
       end
 
       def validate_client
-        !client.nil?
+        client.present?
       end
 
       def validate_grant
         return false unless grant && grant.application_id == client.id
+
         grant.accessible?
       end
 
@@ -70,9 +72,9 @@ module Doorkeeper
         return true unless grant.uses_pkce? || code_verifier
         return false unless grant.pkce_supported?
 
-        if grant.code_challenge_method == 'S256'
+        if grant.code_challenge_method == "S256"
           grant.code_challenge == Doorkeeper.configuration.access_grant_model.generate_code_challenge(code_verifier)
-        elsif grant.code_challenge_method == 'plain'
+        elsif grant.code_challenge_method == "plain"
           grant.code_challenge == code_verifier
         else
           false

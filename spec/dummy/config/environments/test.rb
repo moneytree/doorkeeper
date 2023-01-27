@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 Dummy::Application.configure do
   # Settings specified here will take precedence over those in config/application.rb
 
@@ -8,7 +10,7 @@ Dummy::Application.configure do
   config.cache_classes = true
 
   config.assets.enabled = true
-  config.assets.version = '1.0'
+  config.assets.version = "1.0"
   config.assets.digest = false
 
   # Do not eager load code on boot. This avoids loading your whole application

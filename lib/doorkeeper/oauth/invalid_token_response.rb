@@ -22,6 +22,10 @@ module Doorkeeper
         @reason = attributes[:reason] || :unknown
       end
 
+      def status
+        :unauthorized
+      end
+
       def description
         scope = { scope: %i[doorkeeper errors messages invalid_token] }
         @description ||= I18n.translate @reason, scope
@@ -39,7 +43,7 @@ module Doorkeeper
         {
           expired: Doorkeeper::Errors::TokenExpired,
           revoked: Doorkeeper::Errors::TokenRevoked,
-          unknown: Doorkeeper::Errors::TokenUnknown
+          unknown: Doorkeeper::Errors::TokenUnknown,
         }
       end
     end

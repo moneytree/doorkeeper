@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Doorkeeper
   class RSpec
     # Print's useful information about env: Ruby / Rails versions,
@@ -13,7 +15,7 @@ module Doorkeeper
 
     # Tries to find ORM from the Gemfile used to run test suite
     def self.detect_orm
-      orm = (ENV['BUNDLE_GEMFILE'] || '').match(/Gemfile\.(.+)\.rb/)
+      orm = (ENV["BUNDLE_GEMFILE"] || "").match(/Gemfile\.(.+)\.rb/)
       (orm && orm[1] || :active_record).to_sym
     end
   end

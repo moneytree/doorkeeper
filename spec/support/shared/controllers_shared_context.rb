@@ -1,5 +1,7 @@
-shared_context 'valid token', token: :valid do
-  let(:token_string) { '1A2B3C4D' }
+# frozen_string_literal: true
+
+shared_context "valid token", token: :valid do
+  let(:token_string) { "1A2B3C4D" }
 
   let :token do
     double(Doorkeeper::AccessToken,
@@ -14,8 +16,8 @@ shared_context 'valid token', token: :valid do
   end
 end
 
-shared_context 'invalid token', token: :invalid do
-  let(:token_string) { '1A2B3C4D' }
+shared_context "invalid token", token: :invalid do
+  let(:token_string) { "1A2B3C4D" }
 
   let :token do
     double(Doorkeeper::AccessToken,
@@ -31,22 +33,22 @@ shared_context 'invalid token', token: :invalid do
   end
 end
 
-shared_context 'authenticated resource owner' do
+shared_context "authenticated resource owner" do
   before do
     user = double(:resource, id: 1)
     allow(Doorkeeper.configuration).to receive(:authenticate_resource_owner) { proc { user } }
   end
 end
 
-shared_context 'not authenticated resource owner' do
+shared_context "not authenticated resource owner" do
   before do
-    allow(Doorkeeper.configuration).to receive(:authenticate_resource_owner) { proc { redirect_to '/' } }
+    allow(Doorkeeper.configuration).to receive(:authenticate_resource_owner) { proc { redirect_to "/" } }
   end
 end
 
-shared_context 'valid authorization request' do
+shared_context "valid authorization request" do
   let :authorization do
-    double(:authorization, valid?: true, authorize: true, success_redirect_uri: 'http://something.com/cb?code=token')
+    double(:authorization, valid?: true, authorize: true, success_redirect_uri: "http://something.com/cb?code=token")
   end
 
   before do
@@ -54,7 +56,7 @@ shared_context 'valid authorization request' do
   end
 end
 
-shared_context 'invalid authorization request' do
+shared_context "invalid authorization request" do
   let :authorization do
     double(:authorization, valid?: false, authorize: false, redirect_on_error?: false)
   end
@@ -64,9 +66,9 @@ shared_context 'invalid authorization request' do
   end
 end
 
-shared_context 'expired token', token: :expired do
+shared_context "expired token", token: :expired do
   let :token_string do
-    '1A2B3C4DEXP'
+    "1A2B3C4DEXP"
   end
 
   let :token do
@@ -83,9 +85,9 @@ shared_context 'expired token', token: :expired do
   end
 end
 
-shared_context 'revoked token', token: :revoked do
+shared_context "revoked token", token: :revoked do
   let :token_string do
-    '1A2B3C4DREV'
+    "1A2B3C4DREV"
   end
 
   let :token do
@@ -102,9 +104,9 @@ shared_context 'revoked token', token: :revoked do
   end
 end
 
-shared_context 'forbidden token', token: :forbidden do
+shared_context "forbidden token", token: :forbidden do
   let :token_string do
-    '1A2B3C4DFORB'
+    "1A2B3C4DFORB"
   end
 
   let :token do
