@@ -9,6 +9,11 @@ User-visible changes worth mentioning.
 
 - [#] Add your description here.
 
+## 5.0.2
+
+- [#1158] Fix initializer template: change `handle_auth_errors` option
+- [#1157] Remove redundant index from migration template.
+
 ## 5.0.1
 
 - [#1140] Allow rendering custom errors from exceptions (issue #844). Originally opened as [#944].
