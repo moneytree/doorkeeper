@@ -30,7 +30,7 @@ HEREDOC
     # Semantic versioning
     MAJOR = 5
     MINOR = 1
-    TINY = 0
+    TINY = 1
     PRE = nil
 
     # Full version number
