@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Doorkeeper
   CVE_2018_1000211_WARNING = <<-HEREDOC.freeze
 
@@ -28,7 +30,7 @@ HEREDOC
     # Semantic versioning
     MAJOR = 5
     MINOR = 0
-    TINY = 0
+    TINY = 1
     PRE = nil
 
     # Full version number

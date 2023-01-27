@@ -2,13 +2,23 @@
 
 require 'spec_helper'
 
-describe Doorkeeper::Orm::ActiveRecord::StaleRecordsCleaner do
+describe Doorkeeper::StaleRecordsCleaner do
   let(:cleaner) { described_class.new(model) }
   let(:models_by_name) do
     {
       access_token: Doorkeeper::AccessToken,
       access_grant: Doorkeeper::AccessGrant
     }
+  end
+
+  context 'when ORM has no cleaner class' do
+    it 'raises an error' do
+      allow_any_instance_of(Doorkeeper::Config).to receive(:orm).and_return('hibernate')
+
+      expect do
+        described_class.for(Doorkeeper::AccessToken)
+      end.to raise_error(Doorkeeper::Errors::NoOrmCleaner, /has no cleaner/)
+    end
   end
 
   %i[access_token access_grant].each do |model_name|
@@ -34,7 +44,7 @@ describe Doorkeeper::Orm::ActiveRecord::StaleRecordsCleaner do
           end
 
           it 'keeps the record' do
-            expect { subject }.not_to change { model.count }
+            expect { subject }.not_to(change { model.count })
           end
         end
 
@@ -44,7 +54,7 @@ describe Doorkeeper::Orm::ActiveRecord::StaleRecordsCleaner do
           end
 
           it 'keeps the record' do
-            expect { subject }.not_to change { model.count }
+            expect { subject }.not_to(change { model.count })
           end
         end
       end
@@ -70,7 +80,7 @@ describe Doorkeeper::Orm::ActiveRecord::StaleRecordsCleaner do
           end
 
           it 'keeps the record' do
-            expect { subject }.not_to change { model.count }
+            expect { subject }.not_to(change { model.count })
           end
         end
       end

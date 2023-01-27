@@ -23,6 +23,9 @@ Supported features:
 - [OAuth 2.0 Token Revocation](http://tools.ietf.org/html/rfc7009)
 - [OAuth 2.0 Token Introspection](https://tools.ietf.org/html/rfc7662)
 
+See [list of tutorials](https://github.com/doorkeeper-gem/doorkeeper/wiki#how-tos--tutorials) in order to
+learn how to use the gem or integrate it with other solutions / gems.
+
 ## Documentation valid for `master` branch
 
 Please check the documentation for the version of doorkeeper you are using in:
@@ -50,6 +53,7 @@ https://github.com/doorkeeper-gem/doorkeeper/releases
   - [Routes](#routes)
   - [Authenticating](#authenticating)
   - [Internationalization (I18n)](#internationalization-i18n)
+  - [Customizing errors](#customizing-errors)
   - [Rake Tasks](#rake-tasks)
 - [Protecting resources with OAuth (a.k.a your API endpoint)](#protecting-resources-with-oauth-aka-your-api-endpoint)
   - [Ruby on Rails controllers](#ruby-on-rails-controllers)
@@ -237,6 +241,14 @@ You may want to check other ways of authentication
 Doorkeeper support multiple languages. See language files in
 [the I18n repository](https://github.com/doorkeeper-gem/doorkeeper-i18n).
 
+### Customizing errors
+
+If you don't want to use default Doorkeeper error responses you can raise and rescue it's
+exceptions. All you need is to set configuration option `handle_auth_errors` to `:raise`.
+In this case Doorkeeper will raise `Doorkeeper::Errors::TokenForbidden`,
+`Doorkeeper::Errors::TokenExpired`, `Doorkeeper::Errors::TokenRevoked` or other exceptions
+that you need to care about.
+
 ### Rake Tasks
 
 If you are using `rake`, you can load rake tasks provided by this gem, by adding
@@ -372,7 +384,7 @@ end
 Please note that there is a logical OR between multiple required scopes. In the
 above example, `doorkeeper_authorize! :admin, :write` means that the access
 token is required to have either `:admin` scope or `:write` scope, but does not
-need have both of them.
+need to have both of them.
 
 If you want to require the access token to have multiple scopes at the same
 time, use multiple `doorkeeper_authorize!`, for example:
@@ -448,8 +460,11 @@ token owner.
 
 ### Applications list
 
-By default, the applications list (`/oauth/applications`) is publicly available.
-To protect the endpoint you should uncomment these lines:
+By default, the applications list (`/oauth/applications`) is publicly available (before 5.0 release).
+Starting from Doorkeeper 5.0 it returns 403 Forbidden if `admin_authenticator` option is not configured
+by developers.
+
+To change the protection rules of this endpoint you should uncomment these lines:
 
 ```ruby
 # config/initializers/doorkeeper.rb

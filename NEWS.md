@@ -7,7 +7,17 @@ User-visible changes worth mentioning.
 
 ## master
 
-- [#PR ID] Add PR description.
+- [#] Add your description here.
+
+## 5.0.1
+
+- [#1140] Allow rendering custom errors from exceptions (issue #844). Originally opened as [#944].
+- [#1138] Revert regression bug (check for token expiration in Authorizations controller so authorization
+  triggers every time)
+- [#1149] Fix for `URIChecker#valid_for_authorization?` false negative when query is blank, but `?` present.
+- [#1151] Fix Refresh Token strategy: add proper validation of client credentials both for Public & Private clients.
+- [#1152] Fix migration template: change resource owner data type from integer to Rails generic `references`
+- [#1154] Refactor `StaleRecordsCleaner` to be ORM agnostic.
 
 ## 5.0.0
 
@@ -43,6 +53,12 @@ User-visible changes worth mentioning.
   `Doorkeeper#installed?` method
 - [#1031] Allow public clients to authenticate without `client_secret`. Define an app as
   either public or private/confidential
+  
+  **[IMPORTANT]**: all the applications (clients) now are considered as private by default.
+    You need to manually change `confidential` column to `false` if you are using public clients,
+    in other case your mobile (or other) applications will not be able to authorize.
+    See [#1142](https://github.com/doorkeeper-gem/doorkeeper/issues/1142) for more details.
+  
 - [#1010] Add configuration to enforce configured scopes (`default_scopes` and
   `optional_scopes`) for applications
 - [#1060] Ensure that the native redirect_uri parameter matches with redirect_uri of the client
@@ -61,6 +77,12 @@ User-visible changes worth mentioning.
 - Fix bug with `force_ssl_in_redirect_uri` when it breaks existing applications with an
   SSL redirect_uri.
   
+## 4.4.3
+  
+- [#1143] Adds a config option `opt_out_native_route_change` to opt out of the breaking api
+  changed introduced in https://github.com/doorkeeper-gem/doorkeeper/pull/1003
+
+  
 ## 4.4.2
 
 - [#1130] Backport fix for native redirect_uri from 5.x.
@@ -73,6 +95,11 @@ User-visible changes worth mentioning.
 ## 4.4.0
   
 - [#1120] Backport security fix from 5.x for token revocation when using public clients
+  
+  **[IMPORTANT]**: all the applications (clients) now are considered as private by default.
+  You need to manually change `confidential` column to `false` if you are using public clients,
+  in other case your mobile (or other) applications will not be able to authorize.
+  See [#1142](https://github.com/doorkeeper-gem/doorkeeper/issues/1142) for more details.
 
 ## 4.3.2
 
@@ -101,6 +128,10 @@ User-visible changes worth mentioning.
 - [#985] Generate valid migration files for Rails >= 5
 - [#972] Replace Struct subclassing with block-form initialization
 - [#1003] Use URL query param to pass through native redirect auth code so automated apps can find it.
+
+  **[IMPORTANT]**: Previously authorization code response route was `/oauth/authorize/<code>`,
+  now it is `oauth/authorize/native?code=<code>` (in order to help applications to automatically find the code value).
+
 - [#868] `Scopes#&` and `Scopes#+` now take an array or any other enumerable
   object.
 - [#1019] Remove translation not in use: `invalid_resource_owner`.

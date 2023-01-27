@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Doorkeeper
   module OAuth
     class InvalidTokenResponse < ErrorResponse
@@ -23,6 +25,22 @@ module Doorkeeper
       def description
         scope = { scope: %i[doorkeeper errors messages invalid_token] }
         @description ||= I18n.translate @reason, scope
+      end
+
+      protected
+
+      def exception_class
+        errors_mapping.fetch(reason)
+      end
+
+      private
+
+      def errors_mapping
+        {
+          expired: Doorkeeper::Errors::TokenExpired,
+          revoked: Doorkeeper::Errors::TokenRevoked,
+          unknown: Doorkeeper::Errors::TokenUnknown
+        }
       end
     end
   end

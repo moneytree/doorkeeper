@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Doorkeeper
   class ApplicationMetalController < Doorkeeper.configuration.base_metal_controller.constantize
     MODULES = [

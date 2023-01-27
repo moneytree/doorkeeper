@@ -157,8 +157,7 @@ describe 'doorkeeper authorize filter' do
         module ControllerActions
           remove_method :doorkeeper_unauthorized_render_options
 
-          def doorkeeper_unauthorized_render_options(error: nil)
-          end
+          def doorkeeper_unauthorized_render_options(error: nil); end
         end
       end
 
@@ -303,6 +302,49 @@ describe 'doorkeeper authorize filter' do
       it 'overrides the default status code' do
         get :index, params: { access_token: token_string }
         expect(response.status).to eq 404
+      end
+    end
+  end
+
+  context 'when handle_auth_errors option is set to :raise' do
+    subject { get :index, params: { access_token: token_string } }
+
+    before do
+      config_is_set(:handle_auth_errors, :raise)
+    end
+
+    controller do
+      before_action :doorkeeper_authorize!
+      include ControllerActions
+    end
+
+    context 'when token is unknown' do
+      it 'raises Doorkeeper::Errors::TokenUnknown exception', token: :invalid do
+        expect { subject }.to raise_error(Doorkeeper::Errors::TokenUnknown)
+      end
+    end
+
+    context 'when token is expired' do
+      it 'raises Doorkeeper::Errors::TokenExpired exception', token: :expired do
+        expect { subject }.to raise_error(Doorkeeper::Errors::TokenExpired)
+      end
+    end
+
+    context 'when token is revoked' do
+      it 'raises Doorkeeper::Errors::TokenRevoked exception', token: :revoked do
+        expect { subject }.to raise_error(Doorkeeper::Errors::TokenRevoked)
+      end
+    end
+
+    context 'when token is forbidden' do
+      it 'raises Doorkeeper::Errors::TokenForbidden exception', token: :forbidden do
+        expect { subject }.to raise_error(Doorkeeper::Errors::TokenForbidden)
+      end
+    end
+
+    context 'when token is valid' do
+      it 'allows into index action', token: :valid do
+        expect(response).to be_successful
       end
     end
   end

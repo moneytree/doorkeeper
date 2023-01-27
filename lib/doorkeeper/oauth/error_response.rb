@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Doorkeeper
   module OAuth
     class ErrorResponse < BaseResponse
@@ -55,12 +57,20 @@ module Doorkeeper
         }
       end
 
+      def raise_exception!
+        raise exception_class.new(self), description
+      end
+
       protected
 
       delegate :realm, to: :configuration
 
       def configuration
         Doorkeeper.configuration
+      end
+
+      def exception_class
+        raise NotImplementedError, "error response must define #exception_class"
       end
 
       private

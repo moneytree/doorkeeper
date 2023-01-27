@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Doorkeeper
   class ApplicationsController < Doorkeeper::ApplicationController
     layout 'doorkeeper/admin' unless Doorkeeper.configuration.api_only
@@ -77,8 +79,8 @@ module Doorkeeper
     end
 
     def application_params
-      params.require(:doorkeeper_application).
-        permit(:name, :redirect_uri, :scopes, :confidential)
+      params.require(:doorkeeper_application)
+        .permit(:name, :redirect_uri, :scopes, :confidential)
     end
   end
 end

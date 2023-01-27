@@ -107,7 +107,7 @@ module Doorkeeper
       def use_refresh_token(enabled = true, &block)
         @config.instance_variable_set(
           :@refresh_token_enabled,
-          block ? block : enabled
+          block || enabled
         )
       end
 
@@ -194,7 +194,7 @@ module Doorkeeper
             value = if attribute_builder
                       attribute_builder.new(&block).build
                     else
-                      block ? block : args.first
+                      block || args.first
                     end
 
             @config.instance_variable_set(:"@#{attribute}", value)
@@ -256,6 +256,7 @@ module Doorkeeper
     option :native_redirect_uri,            default: 'urn:ietf:wg:oauth:2.0:oob'
     option :active_record_options,          default: {}
     option :grant_flows,                    default: %w[authorization_code client_credentials]
+    option :handle_auth_errors,             default: :render
 
     # Allows to forbid specific Application redirect URI's by custom rules.
     # Doesn't forbid any URI by default.
@@ -352,6 +353,10 @@ module Doorkeeper
 
     def confirm_application_owner?
       !!(defined?(@confirm_application_owner) && @confirm_application_owner)
+    end
+
+    def raise_on_errors?
+      handle_auth_errors == :raise
     end
 
     def default_scopes
