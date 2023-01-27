@@ -1,4 +1,4 @@
-require 'spec_helper_integration'
+require 'spec_helper'
 
 module Doorkeeper::OAuth
   describe PasswordAccessTokenRequest do
@@ -8,7 +8,9 @@ module Doorkeeper::OAuth
         default_scopes: Doorkeeper::OAuth::Scopes.new,
         access_token_expires_in: 2.hours,
         refresh_token_enabled?: false,
-        custom_access_token_expires_in: ->(_app) { nil }
+        custom_access_token_expires_in: lambda { |context|
+          context.grant_type == Doorkeeper::OAuth::PASSWORD ? 1234 : nil
+        }
       )
     end
     let(:client) { FactoryBot.create(:application) }
@@ -22,6 +24,7 @@ module Doorkeeper::OAuth
       expect do
         subject.authorize
       end.to change { client.reload.access_tokens.count }.by(1)
+      expect(client.reload.access_tokens.sort_by(&:created_at).last.expires_in).to eq(1234)
     end
 
     it 'issues a new token without a client' do
@@ -90,6 +93,38 @@ module Doorkeeper::OAuth
           subject.authorize
         end.to change { Doorkeeper::AccessToken.count }.by(1)
         expect(Doorkeeper::AccessToken.last.scopes).to include('public')
+      end
+    end
+
+    describe 'with custom expiry' do
+      let(:server) do
+        double(
+          :server,
+          default_scopes: Doorkeeper::OAuth::Scopes.new,
+          access_token_expires_in: 2.hours,
+          refresh_token_enabled?: false,
+          custom_access_token_expires_in: lambda { |context|
+            context.scopes.exists?('public') ? 222 : nil
+          }
+        )
+      end
+
+      it 'checks scopes' do
+        subject = PasswordAccessTokenRequest.new(server, client, owner, scope: 'public')
+        allow(server).to receive(:scopes).and_return(Doorkeeper::OAuth::Scopes.from_string('public'))
+        expect do
+          subject.authorize
+        end.to change { Doorkeeper::AccessToken.count }.by(1)
+        expect(Doorkeeper::AccessToken.last.expires_in).to eq(222)
+      end
+
+      it 'falls back to the default otherwise' do
+        subject = PasswordAccessTokenRequest.new(server, client, owner, scope: 'private')
+        allow(server).to receive(:scopes).and_return(Doorkeeper::OAuth::Scopes.from_string('private'))
+        expect do
+          subject.authorize
+        end.to change { Doorkeeper::AccessToken.count }.by(1)
+        expect(Doorkeeper::AccessToken.last.expires_in).to eq(2.hours)
       end
     end
   end

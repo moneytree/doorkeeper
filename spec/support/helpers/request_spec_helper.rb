@@ -1,4 +1,8 @@
 module RequestSpecHelper
+  def i_am_logged_in
+    allow(Doorkeeper.configuration).to receive(:authenticate_admin).and_return(->(*) {})
+  end
+
   def i_should_see(content)
     expect(page).to have_content(content)
   end
@@ -39,6 +43,10 @@ module RequestSpecHelper
     expect(headers[header]).to eq(value)
   end
 
+  def should_have_status(status)
+    expect(page.driver.response.status).to eq(status)
+  end
+
   def with_access_token_header(token)
     with_header 'Authorization', "Bearer #{token}"
   end
@@ -68,8 +76,8 @@ module RequestSpecHelper
     click_on 'Sign in'
   end
 
-  def create_access_token(authorization_code, client)
-    page.driver.post token_endpoint_url(code: authorization_code, client: client)
+  def create_access_token(authorization_code, client, code_verifier = nil)
+    page.driver.post token_endpoint_url(code: authorization_code, client: client, code_verifier: code_verifier)
   end
 
   def create_access_token_with_pkce(authorization_code, client, code_verifier = nil)

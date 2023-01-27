@@ -13,6 +13,8 @@ module Doorkeeper
     validates :redirect_uri, redirect_uri: true
     validates :confidential, inclusion: { in: [true, false] }
 
+    validate :scopes_match_configured, if: :enforce_scopes?
+
     before_validation :generate_uid, :generate_secret, on: :create
 
     has_many :authorized_tokens, -> { where(revoked_at: nil) }, class_name: Doorkeeper.configuration.access_token_class
@@ -32,20 +34,15 @@ module Doorkeeper
       where(id: resource_access_tokens.select(:application_id).distinct)
     end
 
-    # Fallback to existing, default behaviour of assuming all apps to be
-    # confidential if the migration hasn't been run
-    def confidential
-      return super if self.class.supports_confidentiality?
-      ActiveSupport::Deprecation.warn 'You are susceptible to security bug ' \
-        'CVE-2018-1000211. Please follow instructions outlined in ' \
-        'Doorkeeper::CVE_2018_1000211_WARNING'
-      true
-    end
-
-    alias_method :confidential?, :confidential
-
-    def self.supports_confidentiality?
-      column_names.include?('confidential')
+    # Revokes AccessToken and AccessGrant records that have not been revoked and
+    # associated with the specific Application and Resource Owner.
+    #
+    # @param resource_owner [ActiveRecord::Base]
+    #   instance of the Resource Owner model
+    #
+    def self.revoke_tokens_and_grants_for(id, resource_owner)
+      Doorkeeper.configuration.access_token_model.revoke_all_for(id, resource_owner)
+      Doorkeeper.configuration.access_grant_model.revoke_all_for(id, resource_owner)
     end
 
     private
@@ -56,6 +53,17 @@ module Doorkeeper
 
     def generate_secret
       self.secret = UniqueToken.generate if secret.blank?
+    end
+
+    def scopes_match_configured
+      if scopes.present? &&
+         !ScopeChecker.valid?(scopes.to_s, Doorkeeper.configuration.scopes)
+        errors.add(:scopes, :not_match_configured)
+      end
+    end
+
+    def enforce_scopes?
+      Doorkeeper.configuration.enforce_configured_scopes?
     end
   end
 end

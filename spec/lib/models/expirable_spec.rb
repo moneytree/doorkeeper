@@ -1,6 +1,4 @@
 require 'spec_helper'
-require 'active_support/time'
-require 'doorkeeper/models/concerns/expirable'
 
 describe 'Expirable' do
   subject do
@@ -45,6 +43,5 @@ describe 'Expirable' do
       allow(subject).to receive(:expires_in).and_return(nil)
       expect(subject.expires_in_seconds).to be_nil
     end
-
   end
 end

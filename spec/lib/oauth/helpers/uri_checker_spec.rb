@@ -1,6 +1,4 @@
 require 'spec_helper'
-require 'uri'
-require 'doorkeeper/oauth/helpers/uri_checker'
 
 module Doorkeeper::OAuth::Helpers
   describe URIChecker do
@@ -48,6 +46,11 @@ module Doorkeeper::OAuth::Helpers
       it 'is invalid if is not an uri' do
         uri = '   '
         expect(URIChecker.valid?(uri)).to be_falsey
+      end
+
+      it 'is valid for native uris' do
+        uri = 'urn:ietf:wg:oauth:2.0:oob'
+        expect(URIChecker.valid?(uri)).to be_truthy
       end
     end
 

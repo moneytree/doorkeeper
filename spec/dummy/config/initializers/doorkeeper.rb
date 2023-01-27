@@ -8,7 +8,11 @@ Doorkeeper.configure do
     User.where(id: session[:user_id]).first || redirect_to(root_url, alert: 'Needs sign in.')
   end
 
-  # If you want to restrict access to the web interface for adding oauth authorized applications, you need to declare the block below.
+  # If you didn't skip applications controller from Doorkeeper routes in your application routes.rb
+  # file then you need to declare this block in order to restrict access to the web interface for
+  # adding oauth authorized applications. In other case it will return 403 Forbidden response
+  # every time somebody will try to access the admin web interface.
+  #
   # admin_authenticator do
   #   # Put your admin authentication logic here.
   #   # Example implementation:
@@ -29,10 +33,11 @@ Doorkeeper.configure do
   # Issue access tokens with refresh token (disabled by default)
   use_refresh_token
 
-  # Opt out of breaking api change to the native authorization code flow. Opting out sets the authorization
-  # code response route for native redirect uris to oauth/authorize/<code>. The default is oauth/authorize/native?code=<code>.
-  # Rationale: https://github.com/doorkeeper-gem/doorkeeper/issues/1143
-  # opt_out_native_route_change
+  # Forbids creating/updating applications with arbitrary scopes that are
+  # not in configuration, i.e. `default_scopes` or `optional_scopes`.
+  # (disabled by default)
+  #
+  # enforce_configured_scopes
 
   # Provide support for an owner to be assigned to each registered application (disabled by default)
   # Optional parameter confirmation: true (default false) if you want to enforce ownership of
