@@ -26,11 +26,12 @@ HEREDOC
 
   module VERSION
     # Semantic versioning
-    MAJOR = 4
-    MINOR = 4
-    TINY = 3
+    MAJOR = 5
+    MINOR = 0
+    TINY = 0
+    PRE = nil
 
     # Full version number
-    STRING = [MAJOR, MINOR, TINY].compact.join('.')
+    STRING = [MAJOR, MINOR, TINY, PRE].compact.join('.')
   end
 end

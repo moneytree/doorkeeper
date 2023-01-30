@@ -1,4 +1,4 @@
-require 'spec_helper_integration'
+require 'spec_helper'
 
 module Doorkeeper::OAuth
   describe AuthorizationCodeRequest do
@@ -6,7 +6,9 @@ module Doorkeeper::OAuth
       double :server,
              access_token_expires_in: 2.days,
              refresh_token_enabled?: false,
-             custom_access_token_expires_in: ->(_app) { nil }
+             custom_access_token_expires_in: lambda { |context|
+               context.grant_type == Doorkeeper::OAuth::AUTHORIZATION_CODE ? 1234 : nil
+             }
     end
 
     let(:grant)  { FactoryBot.create :access_grant }
@@ -22,6 +24,8 @@ module Doorkeeper::OAuth
       expect do
         subject.authorize
       end.to change { client.reload.access_tokens.count }.by(1)
+
+      expect(client.reload.access_tokens.sort_by(&:created_at).last.expires_in).to eq(1234)
     end
 
     it "issues the token with same grant's scopes" do
@@ -70,9 +74,12 @@ module Doorkeeper::OAuth
     end
 
     it 'skips token creation if there is a matching one' do
+      scopes = grant.scopes
+
       Doorkeeper.configure do
         orm DOORKEEPER_ORM
         reuse_access_token
+        default_scopes(*scopes)
       end
 
       FactoryBot.create(:access_token, application_id: client.id,

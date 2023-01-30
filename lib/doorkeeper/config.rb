@@ -15,19 +15,19 @@ module Doorkeeper
   end
 
   def self.configuration
-    @config || (fail MissingConfiguration)
+    @config || (raise MissingConfiguration)
   end
 
   def self.setup_orm_adapter
     @orm_adapter = "doorkeeper/orm/#{configuration.orm}".classify.constantize
-  rescue NameError => e
-    fail e, "ORM adapter not found (#{configuration.orm})", <<-ERROR_MSG.squish
-[doorkeeper] ORM adapter not found (#{configuration.orm}), or there was an error
-trying to load it.
+  rescue NameError => error
+    raise error, "ORM adapter not found (#{configuration.orm})", <<-ERROR_MSG.strip_heredoc
+      [doorkeeper] ORM adapter not found (#{configuration.orm}), or there was an error
+      trying to load it.
 
-You probably need to add the related gem for this adapter to work with
-doorkeeper.
-      ERROR_MSG
+      You probably need to add the related gem for this adapter to work with
+      doorkeeper.
+    ERROR_MSG
   end
 
   def self.setup_orm_models
@@ -90,7 +90,7 @@ doorkeeper.
       #
       # @param methods [Array] Define client credentials
       def client_credentials(*methods)
-        @config.instance_variable_set(:@client_credentials, methods)
+        @config.instance_variable_set(:@client_credentials_methods, methods)
       end
 
       # Change the way access token is authenticated from the request object.
@@ -103,9 +103,12 @@ doorkeeper.
         @config.instance_variable_set(:@access_token_methods, methods)
       end
 
-      # Issue access tokens with refresh token (disabled by default)
-      def use_refresh_token
-        @config.instance_variable_set(:@refresh_token_enabled, true)
+      # Issue access tokens with refresh token (disabled if not set)
+      def use_refresh_token(enabled = true, &block)
+        @config.instance_variable_set(
+          :@refresh_token_enabled,
+          block ? block : enabled
+        )
       end
 
       # Reuse access token for the same resource owner within an application
@@ -130,6 +133,25 @@ doorkeeper.
       # Rationale: https://github.com/doorkeeper-gem/doorkeeper/issues/1143
       def opt_out_native_route_change
         @config.instance_variable_set(:@opt_out_native_route_change, true)
+      end
+      
+      # Use an API mode for applications generated with --api argument
+      # It will skip applications controller, disable forgery protection
+      def api_only
+        @config.instance_variable_set(:@api_only, true)
+      end
+
+      # Forbids creating/updating applications with arbitrary scopes that are
+      # not in configuration, i.e. `default_scopes` or `optional_scopes`.
+      # (disabled by default)
+      def enforce_configured_scopes
+        @config.instance_variable_set(:@enforce_configured_scopes, true)
+      end
+
+      # Enforce request content type as the spec requires:
+      # disabled by default for backward compatibility.
+      def enforce_content_type
+        @config.instance_variable_set(:@enforce_content_type, true)
       end
     end
 
@@ -196,25 +218,39 @@ doorkeeper.
     option :resource_owner_authenticator,
            as: :authenticate_resource_owner,
            default: (lambda do |_routes|
-             ::Rails.logger.warn(I18n.t('doorkeeper.errors.messages.resource_owner_authenticator_not_configured'))
+             ::Rails.logger.warn(
+               I18n.t('doorkeeper.errors.messages.resource_owner_authenticator_not_configured')
+             )
+
              nil
            end)
 
     option :admin_authenticator,
            as: :authenticate_admin,
-           default: ->(_routes) {}
+           default: (lambda do |_routes|
+             ::Rails.logger.warn(
+               I18n.t('doorkeeper.errors.messages.admin_authenticator_not_configured')
+             )
+
+             head :forbidden
+           end)
 
     option :resource_owner_from_credentials,
            default: (lambda do |_routes|
-             ::Rails.logger.warn(I18n.t('doorkeeper.errors.messages.credential_flow_not_configured'))
+             ::Rails.logger.warn(
+               I18n.t('doorkeeper.errors.messages.credential_flow_not_configured')
+             )
+
              nil
            end)
+    option :before_successful_authorization, default: ->(_context) {}
+    option :after_successful_authorization, default: ->(_context) {}
     option :before_successful_strategy_response, default: ->(_request) {}
     option :after_successful_strategy_response,
            default: ->(_request, _response) {}
     option :skip_authorization,             default: ->(_routes) {}
     option :access_token_expires_in,        default: 7200
-    option :custom_access_token_expires_in, default: ->(_app) { nil }
+    option :custom_access_token_expires_in, default: ->(_context) { nil }
     option :authorization_code_expires_in,  default: 600
     option :orm,                            default: :active_record
     option :native_redirect_uri,            default: 'urn:ietf:wg:oauth:2.0:oob'
@@ -249,7 +285,6 @@ doorkeeper.
     #
     option :force_ssl_in_redirect_uri,      default: !Rails.env.development?
 
-
     # Use a custom class for generating the access token.
     # https://github.com/doorkeeper-gem/doorkeeper#custom-access-token-generator
     #
@@ -276,6 +311,16 @@ doorkeeper.
            default: 'Doorkeeper::Application'
 
     attr_reader :reuse_access_token
+    attr_reader :api_only
+    attr_reader :enforce_content_type
+
+    def api_only
+      @api_only ||= false
+    end
+
+    def enforce_content_type
+      @enforce_content_type ||= false
+    end
 
     def access_token_model
       @access_token_model ||= Doorkeeper.configuration.access_token_class.constantize
@@ -290,18 +335,23 @@ doorkeeper.
     end
 
     def refresh_token_enabled?
-      @refresh_token_enabled ||= false
-      !!@refresh_token_enabled
+      if defined?(@refresh_token_enabled)
+        @refresh_token_enabled
+      else
+        false
+      end
+    end
+
+    def enforce_configured_scopes?
+      !!(defined?(@enforce_configured_scopes) && @enforce_configured_scopes)
     end
 
     def enable_application_owner?
-      @enable_application_owner ||= false
-      !!@enable_application_owner
+      !!(defined?(@enable_application_owner) && @enable_application_owner)
     end
 
     def confirm_application_owner?
-      @confirm_application_owner ||= false
-      !!@confirm_application_owner
+      !!(defined?(@confirm_application_owner) && @confirm_application_owner)
     end
 
     def default_scopes
@@ -317,7 +367,7 @@ doorkeeper.
     end
 
     def client_credentials_methods
-      @client_credentials ||= %i[from_basic from_params]
+      @client_credentials_methods ||= %i[from_basic from_params]
     end
 
     def access_token_methods
@@ -325,11 +375,11 @@ doorkeeper.
     end
 
     def authorization_response_types
-      @authorization_response_types ||= calculate_authorization_response_types
+      @authorization_response_types ||= calculate_authorization_response_types.freeze
     end
 
     def token_grant_types
-      @token_grant_types ||= calculate_token_grant_types
+      @token_grant_types ||= calculate_token_grant_types.freeze
     end
 
     def native_authorization_code_route

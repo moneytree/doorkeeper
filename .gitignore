@@ -17,4 +17,4 @@ gemfiles/*.lock
 /doc/
 /rdoc/
 coverage
-*/.DS_Store
+*.gem

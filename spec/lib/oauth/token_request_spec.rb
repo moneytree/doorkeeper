@@ -1,10 +1,9 @@
-require 'spec_helper_integration'
+require 'spec_helper'
 
 module Doorkeeper::OAuth
   describe TokenRequest do
     let :application do
-      scopes = double(all: ['public'])
-      double(:application, id: 9990, scopes: scopes)
+      FactoryBot.create(:application, scopes: "public")
     end
 
     let :pre_auth do
@@ -51,8 +50,8 @@ module Doorkeeper::OAuth
       before do
         Doorkeeper.configure do
           orm DOORKEEPER_ORM
-          custom_access_token_expires_in do |_oauth_client|
-            1234
+          custom_access_token_expires_in do |context|
+            context.grant_type == Doorkeeper::OAuth::IMPLICIT ? 1234 : nil
           end
         end
       end

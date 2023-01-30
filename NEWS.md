@@ -1,8 +1,64 @@
 # News
 
+See https://github.com/doorkeeper-gem/doorkeeper/wiki/Migration-from-old-versions for
+upgrade guides.
+
 User-visible changes worth mentioning.
 
 ## master
+
+## 5.0.0
+
+- [#1127] Change the token_type initials of the Banner Token to uppercase to comply with the RFC6750 specification.
+
+## 5.0.0.rc2
+
+- [#1106] Restrict access to AdminController with 'Forbidden 403' if admin_authenticator is not
+  configured by developers..
+- [#1108] Simple formating of callback URLs when listing oauth applications
+- [#1116] `AccessGrant`s will now be revoked along with `AccessToken`s when
+  hitting the `AuthorizedApplicationController#destroy` route.
+- [#1114] Make token info endpoint's attributes consistent with token creation
+- [#1119] Fix token revocation for OAuth apps using "implicit" grant flow
+- [#1122] Fix AuthorizationsController#new error response to be in JSON format
+
+## 5.0.0.rc1
+
+- [#1103] Allow customizing use_refresh_token
+- [#1089] Removed enable_pkce_without_secret configuration option
+- [#1102] Expiration time based on scopes
+- [#1099] All the configuration variables in `Doorkeeper.configuration` now
+  always return a non-nil value (`true` or `false`)
+- [#1099] ORM / Query optimization: Do not revoke the refresh token if it is not enabled
+  in `doorkeeper.rb`
+- [#996] Expiration Time Base On Grant Type
+- [#997] Allow PKCE authorization_code flow as specified in RFC7636
+- [#907] Fix lookup for matching tokens in certain edge-cases
+- [#992] Add API option to use Doorkeeper without management views for API only
+  Rails applications (`api_only`)
+- [#1045] Validate redirect_uri as the native URI when making authorization code requests
+- [#1048] Remove deprecated `Doorkeeper#configured?`, `Doorkeeper#database_installed?`, and
+  `Doorkeeper#installed?` method
+- [#1031] Allow public clients to authenticate without `client_secret`. Define an app as
+  either public or private/confidential
+- [#1010] Add configuration to enforce configured scopes (`default_scopes` and
+  `optional_scopes`) for applications
+- [#1060] Ensure that the native redirect_uri parameter matches with redirect_uri of the client
+- [#1064] Add :before_successful_authorization and :after_successful_authorization hooks
+- [#1069] Upgrade Bootstrap to 4 for Admin
+- [#1068] Add rake task to cleanup databases that can become large over time
+- [#1072] AuthorizationsController: Memoize strategy.authorize_response result to enable
+  subclasses to use the response object.
+- [#1075] Call `before_successful_authorization` and `after_successful_authorization` hooks
+  on `create` action as well as `new`
+- [#1082] Fix #916: remember routes mapping and use it required places (fix error with
+  customized Token Info route).
+- [#1086, #1088] Fix bug with receiving default scopes in the token even if they are
+  not present in the application scopes (use scopes intersection).
+- [#1076] Add config to enforce content type to application/x-www-form-urlencoded
+- Fix bug with `force_ssl_in_redirect_uri` when it breaks existing applications with an
+  SSL redirect_uri.
+  
 
 ## 4.4.3
 - [#1143] Adds a config option opt_out_native_route_change to opt out of the
@@ -10,8 +66,9 @@ User-visible changes worth mentioning.
   https://github.com/doorkeeper-gem/doorkeeper/pull/1003
 
 ## 4.4.2
-- [#1130] Backport fix for native redirect_uri from 5.x.
 
+- [#1130] Backport fix for native redirect_uri from 5.x.
+  
 ## 4.4.1
 
 - [#1127] Backport token type to comply with the RFC6750 specification.

@@ -9,10 +9,13 @@ module Doorkeeper
     include Models::Orderable
     include Models::Scopes
 
-    included do
-      def uses_pkce?
-        code_challenge.present?
-      end
+    # never uses pkce, if pkce migrations were not generated
+    def uses_pkce?
+      pkce_supported? && code_challenge.present?
+    end
+
+    def pkce_supported?
+      respond_to? :code_challenge
     end
 
     module ClassMethods
@@ -26,6 +29,21 @@ module Doorkeeper
       #
       def by_token(token)
         find_by(token: token.to_s)
+      end
+
+      # Revokes AccessGrant records that have not been revoked and associated
+      # with the specific Application and Resource Owner.
+      #
+      # @param application_id [Integer]
+      #   ID of the Application
+      # @param resource_owner [ActiveRecord::Base]
+      #   instance of the Resource Owner model
+      #
+      def revoke_all_for(application_id, resource_owner, clock = Time)
+        where(application_id: application_id,
+              resource_owner_id: resource_owner.id,
+              revoked_at: nil).
+          update_all(revoked_at: clock.now.utc)
       end
 
       # Implements PKCE code_challenge encoding without base64 padding as described in the spec.
@@ -61,7 +79,7 @@ module Doorkeeper
       # urlsafe_encode64(bin)
       # Returns the Base64-encoded version of bin. This method complies with
       # “Base 64 Encoding with URL and Filename Safe Alphabet” in RFC 4648.
-      # The alphabet uses ‘-’ instead of ‘+’ and ‘_’ instead of ‘/’.
+      # The alphabet uses '-' instead of '+' and '_' instead of '/'.
 
       # @param code_verifier [#to_s] a one time use value (any object that responds to `#to_s`)
       #
@@ -69,6 +87,10 @@ module Doorkeeper
       def generate_code_challenge(code_verifier)
         padded_result = Base64.urlsafe_encode64(Digest::SHA256.digest(code_verifier))
         padded_result.split('=')[0] # Remove any trailing '='
+      end
+
+      def pkce_supported?
+        new.pkce_supported?
       end
     end
   end
