@@ -56,7 +56,7 @@ module Doorkeeper
       private
 
       def build_scopes
-        client_scopes = client.application.scopes
+        client_scopes = client&.application&.scopes
         if client_scopes.blank?
           server.default_scopes.to_s
         else
