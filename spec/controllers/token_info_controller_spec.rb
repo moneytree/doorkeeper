@@ -1,32 +1,24 @@
-require 'spec_helper_integration'
+require 'spec_helper'
 
 describe Doorkeeper::TokenInfoController do
   describe 'when requesting token info with valid token' do
     let(:doorkeeper_token) { FactoryBot.create(:access_token) }
 
-    before(:each) do
-      allow(controller).to receive(:doorkeeper_token) { doorkeeper_token }
-    end
-
     describe 'successful request' do
-      it 'responds with tokeninfo' do
-        get :show
+      it 'responds with token info' do
+        get :show, params: { access_token: doorkeeper_token.token }
 
         expect(response.body).to eq(doorkeeper_token.to_json)
       end
 
       it 'responds with a 200 status' do
-        get :show
+        get :show, params: { access_token: doorkeeper_token.token }
 
         expect(response.status).to eq 200
       end
     end
 
     describe 'invalid token response' do
-      before(:each) do
-        allow(controller).to receive(:doorkeeper_token).and_return(nil)
-      end
-
       it 'responds with 401 when doorkeeper_token is not valid' do
         get :show
 

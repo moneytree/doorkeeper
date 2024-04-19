@@ -1,4 +1,4 @@
-require 'spec_helper_integration'
+require 'spec_helper'
 
 describe 'Resource Owner Password Credentials Flow not set up' do
   before do
@@ -7,7 +7,7 @@ describe 'Resource Owner Password Credentials Flow not set up' do
   end
 
   context 'with valid user credentials' do
-    it 'doesn\'t issue new token' do
+    it 'does not issue new token' do
       expect do
         post password_token_endpoint_url(client: @client, resource_owner: @resource_owner)
       end.to_not(change { Doorkeeper::AccessToken.count })
@@ -137,6 +137,60 @@ describe 'Resource Owner Password Credentials Flow' do
         should_have_json 'access_token', token.token
         should_have_json 'scope', 'public'
       end
+    end
+  end
+
+  context 'when application scopes are present and differs from configured default scopes and no scope is passed' do
+    before do
+      default_scopes_exist :public
+      @client.update_attributes(scopes: 'abc')
+    end
+
+    it 'issues new token without any scope' do
+      expect do
+      post password_token_endpoint_url(client: @client, resource_owner: @resource_owner)
+      end.to change { Doorkeeper::AccessToken.count }.by(1)
+
+      token = Doorkeeper::AccessToken.first
+
+      expect(token.application_id).to eq @client.id
+      expect(token.scopes).to be_empty
+      should_have_json 'access_token', token.token
+      should_not_have_json 'scope'
+    end
+  end
+
+  context 'when application scopes contain some of the default scopes and no scope is passed' do
+    before do
+      @client.update_attributes(scopes: 'read write public')
+    end
+
+    it 'issues new token with one default scope that are present in application scopes' do
+      default_scopes_exist :public, :admin
+
+      expect do
+        post password_token_endpoint_url(client: @client, resource_owner: @resource_owner)
+      end.to change { Doorkeeper::AccessToken.count }.by(1)
+
+      token = Doorkeeper::AccessToken.first
+
+      expect(token.application_id).to eq @client.id
+      should_have_json 'access_token', token.token
+      should_have_json 'scope', 'public'
+    end
+
+    it 'issues new token with multiple default scopes that are present in application scopes' do
+      default_scopes_exist :public, :read, :update
+
+      expect do
+        post password_token_endpoint_url(client: @client, resource_owner: @resource_owner)
+      end.to change { Doorkeeper::AccessToken.count }.by(1)
+
+      token = Doorkeeper::AccessToken.first
+
+      expect(token.application_id).to eq @client.id
+      should_have_json 'access_token', token.token
+      should_have_json 'scope', 'public read'
     end
   end
 

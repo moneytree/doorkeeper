@@ -1,4 +1,4 @@
-require 'spec_helper_integration'
+require 'spec_helper'
 
 describe Doorkeeper, 'configuration' do
   subject { Doorkeeper.configuration }
@@ -122,7 +122,7 @@ describe Doorkeeper, 'configuration' do
     it 'has all scopes' do
       Doorkeeper.configure do
         orm DOORKEEPER_ORM
-        default_scopes  :normal
+        default_scopes :normal
         optional_scopes :admin
       end
 
@@ -132,7 +132,7 @@ describe Doorkeeper, 'configuration' do
 
   describe 'use_refresh_token' do
     it 'is false by default' do
-      expect(subject.refresh_token_enabled?).to be_falsey
+      expect(subject.refresh_token_enabled?).to eq(false)
     end
 
     it 'can change the value' do
@@ -141,7 +141,25 @@ describe Doorkeeper, 'configuration' do
         use_refresh_token
       end
 
-      expect(subject.refresh_token_enabled?).to be_truthy
+      expect(subject.refresh_token_enabled?).to eq(true)
+    end
+
+    it 'can accept a boolean parameter' do
+      Doorkeeper.configure do
+        orm DOORKEEPER_ORM
+        use_refresh_token false
+      end
+
+      expect(subject.refresh_token_enabled?).to eq(false)
+    end
+
+    it 'can accept a block parameter' do
+      Doorkeeper.configure do
+        orm DOORKEEPER_ORM
+        use_refresh_token { |_context| nil }
+      end
+
+      expect(subject.refresh_token_enabled?).to be_a(Proc)
     end
 
     it "does not includes 'refresh_token' in authorization_response_types" do
@@ -162,28 +180,18 @@ describe Doorkeeper, 'configuration' do
     end
   end
 
-  describe 'opt_out_native_route_change' do
-    around(:each) do |example|
-      Doorkeeper.configure do
-        orm DOORKEEPER_ORM
-        opt_out_native_route_change
-      end
-
-      Rails.application.reload_routes!
-
-      subject { Doorkeeper.configuration }
-
-      example.run
-
-      Doorkeeper.configure do
-        orm DOORKEEPER_ORM
-      end
-
-      Rails.application.reload_routes!
+  describe 'enforce_configured_scopes' do
+    it 'is false by default' do
+      expect(subject.enforce_configured_scopes?).to eq(false)
     end
 
-    it 'sets the native authorization code route /:code' do
-      expect(subject.native_authorization_code_route).to eq('/:code')
+    it 'can change the value' do
+      Doorkeeper.configure do
+        orm DOORKEEPER_ORM
+        enforce_configured_scopes
+      end
+
+      expect(subject.enforce_configured_scopes?).to eq(true)
     end
   end
 
@@ -204,7 +212,7 @@ describe Doorkeeper, 'configuration' do
 
   describe 'force_ssl_in_redirect_uri' do
     it 'is true by default in non-development environments' do
-      expect(subject.force_ssl_in_redirect_uri).to be_truthy
+      expect(subject.force_ssl_in_redirect_uri).to eq(true)
     end
 
     it 'can change the value' do
@@ -213,7 +221,7 @@ describe Doorkeeper, 'configuration' do
         force_ssl_in_redirect_uri(false)
       end
 
-      expect(subject.force_ssl_in_redirect_uri).to be_falsey
+      expect(subject.force_ssl_in_redirect_uri).to eq(false)
     end
 
     it 'can be a callable object' do
@@ -224,7 +232,7 @@ describe Doorkeeper, 'configuration' do
       end
 
       expect(subject.force_ssl_in_redirect_uri).to eq(block)
-      expect(subject.force_ssl_in_redirect_uri.call).to be_falsey
+      expect(subject.force_ssl_in_redirect_uri.call).to eq(false)
     end
   end
 
@@ -245,7 +253,7 @@ describe Doorkeeper, 'configuration' do
 
   describe 'forbid_redirect_uri' do
     it 'is false by default' do
-      expect(subject.forbid_redirect_uri.call(URI.parse('https://localhost'))).to be_falsey
+      expect(subject.forbid_redirect_uri.call(URI.parse('https://localhost'))).to eq(false)
     end
 
     it 'can be a callable object' do
@@ -256,13 +264,13 @@ describe Doorkeeper, 'configuration' do
       end
 
       expect(subject.forbid_redirect_uri).to eq(block)
-      expect(subject.forbid_redirect_uri.call).to be_truthy
+      expect(subject.forbid_redirect_uri.call).to eq(true)
     end
   end
 
   describe 'enable_application_owner' do
     it 'is disabled by default' do
-      expect(Doorkeeper.configuration.enable_application_owner?).not_to be_truthy
+      expect(Doorkeeper.configuration.enable_application_owner?).not_to eq(true)
     end
 
     context 'when enabled without confirmation' do
@@ -278,7 +286,7 @@ describe Doorkeeper, 'configuration' do
       end
 
       it 'Doorkeeper.configuration.confirm_application_owner? returns false' do
-        expect(Doorkeeper.configuration.confirm_application_owner?).not_to be_truthy
+        expect(Doorkeeper.configuration.confirm_application_owner?).not_to eq(true)
       end
     end
 
@@ -295,7 +303,7 @@ describe Doorkeeper, 'configuration' do
       end
 
       it 'Doorkeeper.configuration.confirm_application_owner? returns true' do
-        expect(Doorkeeper.configuration.confirm_application_owner?).to be_truthy
+        expect(Doorkeeper.configuration.confirm_application_owner?).to eq(true)
       end
     end
   end
@@ -324,10 +332,10 @@ describe Doorkeeper, 'configuration' do
     it "can change the value" do
       Doorkeeper.configure do
         orm DOORKEEPER_ORM
-        grant_flows ['authorization_code', 'implicit']
+        grant_flows %w[authorization_code implicit]
       end
 
-      expect(subject.grant_flows).to eq ['authorization_code', 'implicit']
+      expect(subject.grant_flows).to eq %w[authorization_code implicit]
     end
 
     context "when including 'authorization_code'" do
@@ -474,6 +482,36 @@ describe Doorkeeper, 'configuration' do
           )
         end
       end
+    end
+  end
+
+  describe "api_only" do
+    it "is false by default" do
+      expect(subject.api_only).to eq(false)
+    end
+
+    it "can change the value" do
+      Doorkeeper.configure do
+        orm DOORKEEPER_ORM
+        api_only
+      end
+
+      expect(subject.api_only).to eq(true)
+    end
+  end
+
+  describe 'strict_content_type' do
+    it 'is false by default' do
+      expect(subject.enforce_content_type).to eq(false)
+    end
+
+    it "can change the value" do
+      Doorkeeper.configure do
+        orm DOORKEEPER_ORM
+        enforce_content_type
+      end
+
+      expect(subject.enforce_content_type).to eq(true)
     end
   end
 end

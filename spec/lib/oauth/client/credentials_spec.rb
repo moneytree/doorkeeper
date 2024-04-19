@@ -1,6 +1,4 @@
 require 'spec_helper'
-require 'active_support/core_ext/string'
-require 'doorkeeper/oauth/client'
 
 class Doorkeeper::OAuth::Client
   describe Credentials do
@@ -18,7 +16,7 @@ class Doorkeeper::OAuth::Client
       let(:request) { double.as_null_object }
 
       let(:method) do
-        ->(_request) { return 'uid', 'secret' }
+        ->(_request) { ['uid', 'secret'] }
       end
 
       it 'accepts anything that responds to #call' do

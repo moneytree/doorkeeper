@@ -1,12 +1,9 @@
-require 'spec_helper_integration'
+require 'spec_helper'
 
 describe Doorkeeper::TokensController do
   describe 'when authorization has succeeded' do
     let(:token) { double(:token, authorize: true) }
 
-    before do
-      allow(controller).to receive(:token) { token }
-    end
 
     it 'returns the authorization' do
       skip 'verify need of these specs'
@@ -129,7 +126,8 @@ describe Doorkeeper::TokensController do
       expect(strategy).to receive(:authorize).once
       allow(controller).to receive(:strategy) { strategy }
       allow(controller).to receive(:create) do
-        controller.send :authorize_response
+        2.times { controller.send :authorize_response }
+        controller.render json: {}, status: :ok
       end
 
       post :create
@@ -144,7 +142,7 @@ describe Doorkeeper::TokensController do
       it 'responds with full token introspection' do
         request.headers['Authorization'] = "Bearer #{access_token.token}"
 
-        post :introspect, token: access_token.token
+        post :introspect, params: { token: access_token.token }
 
         should_have_json 'active', true
         expect(json_response).to include('client_id', 'token_type', 'exp', 'iat')
@@ -158,7 +156,7 @@ describe Doorkeeper::TokensController do
       it 'responds with full token introspection' do
         request.headers['Authorization'] = basic_auth_header_for_client(client)
 
-        post :introspect, token: access_token.token
+        post :introspect, params: { token: access_token.token }
 
         should_have_json 'active', true
         expect(json_response).to include('client_id', 'token_type', 'exp', 'iat')
@@ -173,7 +171,7 @@ describe Doorkeeper::TokensController do
       it 'responds with full token introspection' do
         request.headers['Authorization'] = basic_auth_header_for_client(client)
 
-        post :introspect, token: access_token.token
+        post :introspect, params: { token: access_token.token }
 
         should_have_json 'active', true
         expect(json_response).to include('client_id', 'token_type', 'exp', 'iat')
@@ -189,7 +187,7 @@ describe Doorkeeper::TokensController do
       it 'responds with only active state' do
         request.headers['Authorization'] = basic_auth_header_for_client(different_client)
 
-        post :introspect, token: access_token.token
+        post :introspect, params: { token: access_token.token }
 
         expect(response).to be_successful
 
@@ -205,7 +203,7 @@ describe Doorkeeper::TokensController do
       it 'responds with invalid_client error' do
         request.headers['Authorization'] = basic_auth_header_for_client(client)
 
-        post :introspect, token: access_token.token
+        post :introspect, params: { token: access_token.token }
 
         expect(response).not_to be_successful
         response_status_should_be 401
@@ -222,7 +220,7 @@ describe Doorkeeper::TokensController do
       it 'responds with only active state' do
         request.headers['Authorization'] = basic_auth_header_for_client(client)
 
-        post :introspect, token: SecureRandom.hex(16)
+        post :introspect, params: { token: SecureRandom.hex(16) }
 
         should_have_json 'active', false
         expect(json_response).not_to include('client_id', 'token_type', 'exp', 'iat')
@@ -236,7 +234,7 @@ describe Doorkeeper::TokensController do
       it 'responds with only active state' do
         request.headers['Authorization'] = basic_auth_header_for_client(client)
 
-        post :introspect, token: access_token.token
+        post :introspect, params: { token: access_token.token }
 
         should_have_json 'active', false
         expect(json_response).not_to include('client_id', 'token_type', 'exp', 'iat')
@@ -250,7 +248,7 @@ describe Doorkeeper::TokensController do
       it 'responds with only active state' do
         request.headers['Authorization'] = basic_auth_header_for_client(client)
 
-        post :introspect, token: access_token.token
+        post :introspect, params: { token: access_token.token }
 
         should_have_json 'active', false
         expect(json_response).not_to include('client_id', 'token_type', 'exp', 'iat')
@@ -261,7 +259,7 @@ describe Doorkeeper::TokensController do
       let(:access_token) { FactoryBot.create(:access_token) }
 
       it 'responds with invalid_request error' do
-        post :introspect, token: access_token.token
+        post :introspect, params: { token: access_token.token }
 
         expect(response).not_to be_successful
         response_status_should_be 401

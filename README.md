@@ -19,6 +19,7 @@ Supported features:
   - [Implicit grant](http://tools.ietf.org/html/draft-ietf-oauth-v2-22#section-4.2)
   - [Resource Owner Password Credentials](http://tools.ietf.org/html/draft-ietf-oauth-v2-22#section-4.3)
   - [Client Credentials](http://tools.ietf.org/html/draft-ietf-oauth-v2-22#section-4.4)
+  - [Proof Key for Code Exchange](https://tools.ietf.org/html/rfc7636)
 - [OAuth 2.0 Token Revocation](http://tools.ietf.org/html/rfc7009)
 - [OAuth 2.0 Token Introspection](https://tools.ietf.org/html/rfc7662)
 
@@ -28,6 +29,7 @@ Please check the documentation for the version of doorkeeper you are using in:
 https://github.com/doorkeeper-gem/doorkeeper/releases
 
 - See the [wiki](https://github.com/doorkeeper-gem/doorkeeper/wiki)
+- See [upgrade guides](https://github.com/doorkeeper-gem/doorkeeper/wiki/Migration-from-old-versions)
 - For general questions, please post in [Stack Overflow](http://stackoverflow.com/questions/tagged/doorkeeper)
 - See [SECURITY.md](SECURITY.md) for this project's security disclose
   policy
@@ -44,9 +46,11 @@ https://github.com/doorkeeper-gem/doorkeeper/releases
     - [MongoDB](#mongodb)
     - [Sequel](#sequel)
     - [Couchbase](#couchbase)
+  - [API mode](#api-mode)
   - [Routes](#routes)
   - [Authenticating](#authenticating)
   - [Internationalization (I18n)](#internationalization-i18n)
+  - [Rake Tasks](#rake-tasks)
 - [Protecting resources with OAuth (a.k.a your API endpoint)](#protecting-resources-with-oauth-aka-your-api-endpoint)
   - [Ruby on Rails controllers](#ruby-on-rails-controllers)
   - [Grape endpoints](#grape-endpoints)
@@ -103,11 +107,25 @@ for each table that includes a `resource_owner_id` column:
 add_foreign_key :table_name, :users, column: :resource_owner_id
 ```
 
+If you want to enable [PKCE flow] for mobile apps, you need to generate another
+migration:
+
+[PKCE flow]: https://tools.ietf.org/html/rfc7636
+
+```sh
+    rails generate doorkeeper:pkce
+```
+
 Then run migrations:
 
 ```sh
 rake db:migrate
 ```
+
+Ensure to use non-confidential apps for pkce. PKCE is created, because
+you cannot trust its apps' secret. So whatever app needs pkce: it means, it cannot
+be a confidential app by design.
+
 
 Remember to add associations to your model so the related records are deleted.
 If you don't do this an `ActiveRecord::InvalidForeignKey`-error will be raised
@@ -145,6 +163,25 @@ Follow configuration instructions for setting up the necessary Doorkeeper ORM.
 Use [doorkeeper-couchbase] extension if you are using Couchbase database.
 
 [doorkeeper-couchbase]: https://github.com/acaprojects/doorkeeper-couchbase
+
+### API mode
+
+By default Doorkeeper uses full Rails stack to provide all the OAuth 2 functionality
+with additional features like administration area for managing applications. By the
+way, starting from Doorkeeper 5 you can use API mode for your [API only Rails 5 applications](http://edgeguides.rubyonrails.org/api_app.html).
+All you need is just to configure the gem to work in desired mode:
+
+``` ruby
+Doorkeeper.configure do
+  # ...
+
+  api_only
+end
+```
+
+Keep in mind, that in this mode you will not be able to access `Applications` or
+`Authorized Applications` controllers because they will be skipped. Also all the
+redirects will be returned as JSON response with corresponding locations.
 
 ### Routes
 
@@ -198,7 +235,36 @@ You may want to check other ways of authentication
 
 ### Internationalization (I18n)
 
-See language files in [the I18n repository](https://github.com/doorkeeper-gem/doorkeeper-i18n).
+Doorkeeper support multiple languages. See language files in
+[the I18n repository](https://github.com/doorkeeper-gem/doorkeeper-i18n).
+
+### Rake Tasks
+
+If you are using `rake`, you can load rake tasks provided by this gem, by adding
+the following line to your `Rakefile`:
+
+```ruby
+Doorkeeper::Rake.load_tasks
+```
+
+#### Cleaning up
+
+By default Doorkeeper is retaining expired and revoked access tokens and grants.
+This allows to keep an audit log of those records, but it also leads to the
+corresponding tables to grow large over the lifetime of your application.
+
+If you are concerned about those tables growing too large,
+you can regularly run the following rake task to remove stale entries
+from the database:
+
+```rake
+rake doorkeeper:db:cleanup
+```
+
+Note that this will remove tokens that are expired according to the configured TTL
+in `Doorkeeper.configuration.access_token_expires_in`. The specific `expires_in`
+value of each access token **is not considered**. The same is true for access
+grants.
 
 ## Protecting resources with OAuth (a.k.a your API endpoint)
 
@@ -399,6 +465,22 @@ customize the controller used by the list or skip the controller all together.
 For more information see the page
 [in the wiki](https://github.com/doorkeeper-gem/doorkeeper/wiki/Customizing-routes).
 
+By default, everybody can create application with any scopes. However,
+you can enforce users to create applications only with configured scopes
+(`default_scopes` and `optional_scopes` from the Doorkeeper initializer):
+
+```ruby
+# config/initializers/doorkeeper.rb
+Doorkeeper.configure do
+  # ...
+
+  default_scopes :read, :write
+  optional_scopes :create, :update
+
+  enforce_configured_scopes
+end
+```
+
 ## Other customizations
 
 - [Associate users to OAuth applications (ownership)](https://github.com/doorkeeper-gem/doorkeeper/wiki/Associate-users-to-OAuth-applications-%28ownership%29)
@@ -412,7 +494,7 @@ Doorkeeper 4.3.0 it uses [ActiveSupport lazy loading hooks](http://api.rubyonrai
 to load models. There are [known issue](https://github.com/doorkeeper-gem/doorkeeper/issues/1043)
 with the `factory_bot_rails` gem (it executes factories building before `ActiveRecord::Base`
 is initialized using hooks in gem railtie, so you can catch a `uninitialized constant` error).
-It is recommended to use pure `factory_bot` gem to solve this problem. 
+It is recommended to use pure `factory_bot` gem to solve this problem.
 
 ## Upgrading
 
@@ -429,7 +511,7 @@ To run the local engine server:
 
 ```
 bundle install
-bundle exec rails server
+bundle exec rake doorkeeper:server
 ````
 
 By default, it uses the latest Rails version with ActiveRecord. To run the
