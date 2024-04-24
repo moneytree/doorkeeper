@@ -6,13 +6,29 @@ upgrade guides.
 User-visible changes worth mentioning.
 
 ## master
+
+- [#] Add description here
+
+## 5.0.0.rc2
+
+- [#1106] Restrict access to AdminController with 'Forbidden 403' if admin_authenticator is not
+  configured by developers..
+- [#1108] Simple formating of callback URLs when listing oauth applications
+- [#1116] `AccessGrant`s will now be revoked along with `AccessToken`s when
+  hitting the `AuthorizedApplicationController#destroy` route.
+- [#1114] Make token info endpoint's attributes consistent with token creation
+- [#1119] Fix token revocation for OAuth apps using "implicit" grant flow
+- [#1122] Fix AuthorizationsController#new error response to be in JSON format
+
+## 5.0.0.rc1
+
 - [#1103] Allow customizing use_refresh_token
 - [#1089] Removed enable_pkce_without_secret configuration option
 - [#1102] Expiration time based on scopes
 - [#1099] All the configuration variables in `Doorkeeper.configuration` now
-          always return a non-nil value (`true` or `false`)
+  always return a non-nil value (`true` or `false`)
 - [#1099] ORM / Query optimization: Do not revoke the refresh token if it is not enabled
-          in `doorkeeper.rb`
+  in `doorkeeper.rb`
 - [#996] Expiration Time Base On Grant Type
 - [#997] Allow PKCE authorization_code flow as specified in RFC7636
 - [#907] Fix lookup for matching tokens in certain edge-cases
@@ -40,6 +56,10 @@ User-visible changes worth mentioning.
 - [#1076] Add config to enforce content type to application/x-www-form-urlencoded
 - Fix bug with `force_ssl_in_redirect_uri` when it breaks existing applications with an
   SSL redirect_uri.
+  
+## 4.4.0
+  
+- [#1120] Backport security fix from 5.x for token revocation when using public clients
 
 ## 4.4.3
 - [#1143] Adds a config option opt_out_native_route_change to opt out of the
