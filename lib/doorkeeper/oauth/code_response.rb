@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Doorkeeper
   module OAuth
     class CodeResponse < BaseResponse
@@ -21,7 +23,7 @@ module Doorkeeper
         elsif response_on_fragment
           Authorization::URIBuilder.uri_with_fragment(
             pre_auth.redirect_uri,
-            access_token: auth.token.token,
+            access_token: auth.token.plaintext_token,
             token_type: auth.token.token_type,
             expires_in: auth.token.expires_in_seconds,
             state: pre_auth.state
@@ -29,7 +31,7 @@ module Doorkeeper
         else
           Authorization::URIBuilder.uri_with_query(
             pre_auth.redirect_uri,
-            code: auth.token.token,
+            code: auth.token.plaintext_token,
             state: pre_auth.state
           )
         end

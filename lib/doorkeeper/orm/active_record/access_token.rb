@@ -1,20 +1,13 @@
+# frozen_string_literal: true
+
 module Doorkeeper
   class AccessToken < ActiveRecord::Base
-    self.table_name = "#{table_name_prefix}oauth_access_tokens#{table_name_suffix}".to_sym
+    self.table_name = "#{table_name_prefix}oauth_access_tokens#{table_name_suffix}"
 
     include AccessTokenMixin
-    include ActiveModel::MassAssignmentSecurity if defined?(::ProtectedAttributes)
 
-    belongs_to_options = {
-      class_name: Doorkeeper.configuration.application_class,
-      inverse_of: :access_tokens
-    }
-
-    if defined?(ActiveRecord::Base) && ActiveRecord::VERSION::MAJOR >= 5
-      belongs_to_options[:optional] = true
-    end
-
-    belongs_to :application, belongs_to_options
+    belongs_to :application, Doorkeeper.configuration.application_class,
+                             inverse_of: :access_tokens, optional: true
 
     validates :token, presence: true, uniqueness: true
     validates :refresh_token, uniqueness: true, if: :use_refresh_token?
@@ -41,7 +34,7 @@ module Doorkeeper
     end
 
     def self.refresh_token_revoked_on_use?
-      column_names.include?('previous_refresh_token')
+      column_names.include?("previous_refresh_token")
     end
   end
 end

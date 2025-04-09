@@ -1,4 +1,6 @@
-require 'doorkeeper/grape/authorization_decorator'
+# frozen_string_literal: true
+
+require "doorkeeper/grape/authorization_decorator"
 
 module Doorkeeper
   module Grape
@@ -27,7 +29,7 @@ module Doorkeeper
       private
 
       def endpoint
-        env['api.endpoint']
+        env["api.endpoint"]
       end
 
       def doorkeeper_token
@@ -44,7 +46,7 @@ module Doorkeeper
       def error_status_codes
         {
           unauthorized: 401,
-          forbidden: 403
+          forbidden: 403,
         }
       end
     end

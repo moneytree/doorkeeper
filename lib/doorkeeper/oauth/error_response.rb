@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Doorkeeper
   module OAuth
     class ErrorResponse < BaseResponse
@@ -25,12 +27,16 @@ module Doorkeeper
         {
           error: name,
           error_description: description,
-          state: state
+          state: state,
         }.reject { |_, v| v.blank? }
       end
 
       def status
-        :unauthorized
+        if name == :invalid_client
+          :unauthorized
+        else
+          :bad_request
+        end
       end
 
       def redirectable?
@@ -48,11 +54,15 @@ module Doorkeeper
 
       def headers
         {
-          'Cache-Control' => 'no-store',
-          'Pragma' => 'no-cache',
-          'Content-Type' => 'application/json; charset=utf-8',
-          'WWW-Authenticate' => authenticate_info
+          "Cache-Control" => "no-store",
+          "Pragma" => "no-cache",
+          "Content-Type" => "application/json; charset=utf-8",
+          "WWW-Authenticate" => authenticate_info,
         }
+      end
+
+      def raise_exception!
+        raise exception_class.new(self), description
       end
 
       protected
@@ -61,6 +71,10 @@ module Doorkeeper
 
       def configuration
         Doorkeeper.configuration
+      end
+
+      def exception_class
+        raise NotImplementedError, "error response must define #exception_class"
       end
 
       private

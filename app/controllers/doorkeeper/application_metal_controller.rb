@@ -1,17 +1,8 @@
+# frozen_string_literal: true
+
 module Doorkeeper
   class ApplicationMetalController < Doorkeeper.configuration.base_metal_controller.constantize
-    MODULES = [
-      ActionController::Instrumentation,
-      AbstractController::Rendering,
-      ActionController::Rendering,
-      ActionController::Renderers::All,
-      AbstractController::Callbacks,
-      Helpers::Controller
-    ].freeze
-
-    MODULES.each do |mod|
-      include mod
-    end
+    include Helpers::Controller
 
     before_action :enforce_content_type,
                   if: -> { Doorkeeper.configuration.enforce_content_type }

@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Doorkeeper
   module OAuth
     class RefreshTokenRequest < BaseRequest
@@ -56,7 +58,7 @@ module Doorkeeper
           resource_owner_id: refresh_token.resource_owner_id,
           scopes: scopes.to_s,
           expires_in: access_token_expires_in,
-          use_refresh_token: true
+          use_refresh_token: true,
         }.tap do |attributes|
           if refresh_token_revoked_on_use?
             attributes[:previous_refresh_token] = refresh_token.refresh_token
@@ -82,16 +84,25 @@ module Doorkeeper
       end
 
       def validate_client
-        !credentials || !!client
+        return true if credentials.blank?
+
+        client.present?
       end
 
+      # @see https://tools.ietf.org/html/draft-ietf-oauth-v2-22#section-1.5
+      #
       def validate_client_match
-        !client || refresh_token.application_id == client.id
+        return true if refresh_token.application_id.blank?
+
+        client && refresh_token.application_id == client.id
       end
 
       def validate_scope
         if @original_scopes.present?
-          ScopeChecker.valid?(@original_scopes, refresh_token.scopes)
+          ScopeChecker.valid?(
+            scope_str: @original_scopes,
+            server_scopes: refresh_token.scopes
+          )
         else
           true
         end

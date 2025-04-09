@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Doorkeeper
   module AccessGrantMixin
     extend ActiveSupport::Concern
@@ -7,6 +9,7 @@ module Doorkeeper
     include Models::Revocable
     include Models::Accessible
     include Models::Orderable
+    include Models::SecretStorable
     include Models::Scopes
 
     # never uses pkce, if pkce migrations were not generated
@@ -28,7 +31,7 @@ module Doorkeeper
       #   if there is no record with such token
       #
       def by_token(token)
-        find_by(token: token.to_s)
+        find_by_plaintext_token(:token, token)
       end
 
       # Revokes AccessGrant records that have not been revoked and associated
@@ -42,8 +45,8 @@ module Doorkeeper
       def revoke_all_for(application_id, resource_owner, clock = Time)
         where(application_id: application_id,
               resource_owner_id: resource_owner.id,
-              revoked_at: nil).
-          update_all(revoked_at: clock.now.utc)
+              revoked_at: nil)
+          .update_all(revoked_at: clock.now.utc)
       end
 
       # Implements PKCE code_challenge encoding without base64 padding as described in the spec.
@@ -78,19 +81,35 @@ module Doorkeeper
       #
       # urlsafe_encode64(bin)
       # Returns the Base64-encoded version of bin. This method complies with
-      # “Base 64 Encoding with URL and Filename Safe Alphabet” in RFC 4648.
+      # "Base 64 Encoding with URL and Filename Safe Alphabet" in RFC 4648.
       # The alphabet uses '-' instead of '+' and '_' instead of '/'.
 
       # @param code_verifier [#to_s] a one time use value (any object that responds to `#to_s`)
       #
-      # @return [#to_s] An encoded code challenge based on the provided verifier suitable for PKCE validation
+      # @return [#to_s] An encoded code challenge based on the provided verifier
+      # suitable for PKCE validation
+      #
       def generate_code_challenge(code_verifier)
         padded_result = Base64.urlsafe_encode64(Digest::SHA256.digest(code_verifier))
-        padded_result.split('=')[0] # Remove any trailing '='
+        padded_result.split("=")[0] # Remove any trailing '='
       end
 
       def pkce_supported?
         new.pkce_supported?
+      end
+
+      ##
+      # Determines the secret storing transformer
+      # Unless configured otherwise, uses the plain secret strategy
+      def secret_strategy
+        ::Doorkeeper.configuration.token_secret_strategy
+      end
+
+      ##
+      # Determine the fallback storing strategy
+      # Unless configured, there will be no fallback
+      def fallback_secret_strategy
+        ::Doorkeeper.configuration.token_secret_fallback_strategy
       end
     end
   end

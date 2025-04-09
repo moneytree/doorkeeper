@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Doorkeeper
   module Models
     module Expirable
@@ -15,6 +17,7 @@ module Doorkeeper
       #   or nil if object never expires.
       def expires_in_seconds
         return nil if expires_in.nil?
+
         expires = expires_at - Time.now.utc
         expires_sec = expires.seconds.round(0)
         expires_sec > 0 ? expires_sec : 0
@@ -22,10 +25,11 @@ module Doorkeeper
 
       # Expiration time (date time of creation + TTL).
       #
-      # @return [Time] expiration time in UTC
+      # @return [Time, nil] expiration time in UTC
+      #   or nil if the object never expires.
       #
       def expires_at
-        created_at + expires_in.seconds
+        expires_in && created_at + expires_in.seconds
       end
     end
   end

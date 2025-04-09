@@ -7,7 +7,83 @@ User-visible changes worth mentioning.
 
 ## master
 
-- [#PR ID] Add PR description.
+- [#PR] Add your PR description here.
+
+## 5.1.0
+
+- [#1243]: Add nil check operator in token checking at token introspection.
+- [#1241] Explaining foreign key options for resource owner in a single place
+- [#1237] Allow to set blank redirect URI if Doorkeeper configured to use redirect URI-less grant flows.
+- [#1234] Fix `StaleRecordsCleaner` to properly work with big amount of records.
+- [#1228] Allow to explicitly set non-expiring tokens in `custom_access_token_expires_in` configuration
+  option using `Float::INIFINITY` return value.
+- [#1224] Do not try to store token if not found by fallback hashing strategy.
+- [#1223] Update Hound/Rubocop rules, correct Doorkeeper codebase to follow style-guides.
+- [#1220] Drop Rails 4.2 & Ruby < 2.4 support.
+
+## 5.1.0.rc2
+
+- [#1208] Unify hashing implementation into secret storing strategies
+
+  **[IMPORTANT]**: If you have been using the master branch of doorkeeper with bcrypt in your Gemfile.lock,
+  your application secrets have been hashed using BCrypt. To restore this behavior, use the initializer option
+  `use_application_hashing using: 'Doorkeeper::SecretStoring::BCrypt`.
+
+- [#1216] Add nil check to `expires_at` method.
+- [#1215] Fix deprecates for Rails 6.
+- [#1214] Scopes field accepts array.
+- [#1209] Fix tokens validation for Token Introspection request.
+- [#1202] Use correct HTTP status codes for error responses.
+
+  **[IMPORTANT]**: this change might break your application if you were relying on the previous
+  401 status codes, this is now a 400 by default, or a 401 for `invalid_client` and `invalid_token` errors.
+
+- [#1201] Fix custom TTL block `client` parameter to always be an `Doorkeeper::Application` instance.
+
+  **[IMPORTANT]**: those who defined `custom_access_token_expires_in` configuration option need to check
+  their block implementation: if you are using `oauth_client.application` to get `Doorkeeper::Application`
+  instance, then you need to replace it with just `oauth_client`.
+
+- [#1200] Increase default Doorkeeper access token value complexity (`urlsafe_base64` instead of just `hex`)
+  matching RFC6749/RFC6750.
+
+  **[IMPORTANT]**: this change have possible side-effects in case you have custom database constraints for
+  access token value, application secrets, refresh tokens or you patched Doorkeeper models and introduced
+  token value validations, or you are using database with case-insensitive WHERE clause like MySQL
+  (you can face some collisions). Before this change access token value matched `[a-f0-9]` regex, and now
+  it matches `[a-zA-Z0-9\-_]`. In case you have such restrictions and your don't use custom token generator
+  please change configuration option `default_generator_method ` to `:hex`.
+
+- [#1195] Allow to customize Token Introspection response (fixes #1194).
+- [#1189] Option to set `token_reuse_limit`.
+- [#1191] Try to load bcrypt for hashing of application secrets, but add fallback.
+
+## 5.1.0.rc1
+
+- [#1188] Use `params` instead of `request.POST` in tokens controller (fixes #1183).
+- [#1182] Fix loopback IP redirect URIs to conform with RFC8252, p. 7.3 (fixes #1170).
+- [#1179] Authorization Code Grant Flow without client id returns invalid_client error.
+- [#1177] Allow to limit `scopes` for certain `grant_types`
+- [#1176] Fix test factory support for `factory_bot_rails`
+- [#1175] Internal refactor: use `scopes_string` inside `scopes`.
+- [#1168] Allow optional hashing of tokens and secrets.
+- [#1164] Fix error when `root_path` is not defined.
+- [#1162] Fix `enforce_content_type` for requests without body.
+
+## 5.0.2
+
+- [#1158] Fix initializer template: change `handle_auth_errors` option
+- [#1157] Remove redundant index from migration template.
+
+## 5.0.1
+
+- [#1154] Refactor `StaleRecordsCleaner` to be ORM agnostic.
+- [#1152] Fix migration template: change resource owner data type from integer to Rails generic `references`
+- [#1151] Fix Refresh Token strategy: add proper validation of client credentials both for Public & Private clients.
+- [#1149] Fix for `URIChecker#valid_for_authorization?` false negative when query is blank, but `?` present.
+- [#1140] Allow rendering custom errors from exceptions (issue #844). Originally opened as [#944].
+- [#1138] Revert regression bug (check for token expiration in Authorizations controller so authorization
+  triggers every time)
 
 ## 5.0.0
 
@@ -15,14 +91,14 @@ User-visible changes worth mentioning.
 
 ## 5.0.0.rc2
 
-- [#1106] Restrict access to AdminController with 'Forbidden 403' if admin_authenticator is not
-  configured by developers..
-- [#1108] Simple formating of callback URLs when listing oauth applications
+- [#1122] Fix AuthorizationsController#new error response to be in JSON format
+- [#1119] Fix token revocation for OAuth apps using "implicit" grant flow
 - [#1116] `AccessGrant`s will now be revoked along with `AccessToken`s when
   hitting the `AuthorizedApplicationController#destroy` route.
 - [#1114] Make token info endpoint's attributes consistent with token creation
-- [#1119] Fix token revocation for OAuth apps using "implicit" grant flow
-- [#1122] Fix AuthorizationsController#new error response to be in JSON format
+- [#1108] Simple formating of callback URLs when listing oauth applications
+- [#1106] Restrict access to AdminController with 'Forbidden 403' if admin_authenticator is not
+  configured by developers.
 
 ## 5.0.0.rc1
 
@@ -43,6 +119,12 @@ User-visible changes worth mentioning.
   `Doorkeeper#installed?` method
 - [#1031] Allow public clients to authenticate without `client_secret`. Define an app as
   either public or private/confidential
+
+  **[IMPORTANT]**: all the applications (clients) now are considered as private by default.
+    You need to manually change `confidential` column to `false` if you are using public clients,
+    in other case your mobile (or other) applications will not be able to authorize.
+    See [#1142](https://github.com/doorkeeper-gem/doorkeeper/issues/1142) for more details.
+
 - [#1010] Add configuration to enforce configured scopes (`default_scopes` and
   `optional_scopes`) for applications
 - [#1060] Ensure that the native redirect_uri parameter matches with redirect_uri of the client
@@ -60,26 +142,15 @@ User-visible changes worth mentioning.
 - [#1076] Add config to enforce content type to application/x-www-form-urlencoded
 - Fix bug with `force_ssl_in_redirect_uri` when it breaks existing applications with an
   SSL redirect_uri.
-  
-## 4.4.2
-
-- [#1130] Backport fix for native redirect_uri from 5.x.
-  
-## 4.4.1
-
-- [#1127] Backport token type to comply with the RFC6750 specification.
-- [#1125] Backport Quote surround I18n yes/no keys
-  
-## 4.4.0
-  
-- [#1120] Backport security fix from 5.x for token revocation when using public clients
 
 ## 4.4.3
-- [#1143] Adds a config option opt_out_native_route_change to opt out of the
-  breaking api changed introduced in
-  https://github.com/doorkeeper-gem/doorkeeper/pull/1003
+
+- [#1143] Adds a config option `opt_out_native_route_change` to opt out of the breaking api
+  changed introduced in https://github.com/doorkeeper-gem/doorkeeper/pull/1003
+
 
 ## 4.4.2
+
 - [#1130] Backport fix for native redirect_uri from 5.x.
 
 ## 4.4.1
@@ -90,6 +161,11 @@ User-visible changes worth mentioning.
 ## 4.4.0
 
 - [#1120] Backport security fix from 5.x for token revocation when using public clients
+
+  **[IMPORTANT]**: all the applications (clients) now are considered as private by default.
+  You need to manually change `confidential` column to `false` if you are using public clients,
+  in other case your mobile (or other) applications will not be able to authorize.
+  See [#1142](https://github.com/doorkeeper-gem/doorkeeper/issues/1142) for more details.
 
 ## 4.3.2
 
@@ -118,6 +194,10 @@ User-visible changes worth mentioning.
 - [#985] Generate valid migration files for Rails >= 5
 - [#972] Replace Struct subclassing with block-form initialization
 - [#1003] Use URL query param to pass through native redirect auth code so automated apps can find it.
+
+  **[IMPORTANT]**: Previously authorization code response route was `/oauth/authorize/<code>`,
+  now it is `oauth/authorize/native?code=<code>` (in order to help applications to automatically find the code value).
+
 - [#868] `Scopes#&` and `Scopes#+` now take an array or any other enumerable
   object.
 - [#1019] Remove translation not in use: `invalid_resource_owner`.

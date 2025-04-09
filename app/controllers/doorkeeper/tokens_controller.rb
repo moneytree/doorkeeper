@@ -1,12 +1,13 @@
+# frozen_string_literal: true
+
 module Doorkeeper
   class TokensController < Doorkeeper::ApplicationMetalController
     def create
-      response = authorize_response
-      headers.merge! response.headers
-      self.response_body = response.body.to_json
-      self.status = response.status
-    rescue Errors::DoorkeeperError => e
-      handle_token_exception e
+      headers.merge!(authorize_response.headers)
+      render json: authorize_response.body,
+             status: authorize_response.status
+    rescue Errors::DoorkeeperError => error
+      handle_token_exception(error)
     end
 
     # OAuth 2.0 Token Revocation - http://tools.ietf.org/html/rfc7009
@@ -31,8 +32,8 @@ module Doorkeeper
       if introspection.authorized?
         render json: introspection.to_json, status: 200
       else
-        error = OAuth::ErrorResponse.new(name: introspection.error)
-        response.headers.merge!(error.headers)
+        error = introspection.error_response
+        headers.merge!(error.headers)
         render json: error.body, status: error.status
       end
     end
@@ -57,6 +58,7 @@ module Doorkeeper
     # https://tools.ietf.org/html/rfc7009
     def authorized?
       return unless token.present?
+
       # Client is confidential, therefore client authentication & authorization
       # is required
       if token.application_id? && token.application.confidential?
@@ -73,12 +75,12 @@ module Doorkeeper
     end
 
     def token
-      @token ||= Doorkeeper.configuration.access_token_model.by_token(request.POST['token']) ||
-      Doorkeeper.configuration.access_token_model.by_refresh_token(request.POST['token'])
+      @token ||= Doorkeeper.configuration.access_token_model.by_token(params["token"]) ||
+                 Doorkeeper.configuration.access_token_model.by_refresh_token(params["token"])
     end
 
     def strategy
-      @strategy ||= server.token_request params[:grant_type]
+      @strategy ||= server.token_request(params[:grant_type])
     end
 
     def authorize_response

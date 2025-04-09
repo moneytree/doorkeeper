@@ -1,27 +1,33 @@
-require 'spec_helper'
+# frozen_string_literal: true
+
+require "spec_helper"
 
 module Doorkeeper::OAuth
   describe BaseRequest do
     let(:access_token) do
       double :access_token,
-        token:              "some-token",
-        expires_in:         "3600",
-        expires_in_seconds: "300",
-        scopes_string:      "two scopes",
-        refresh_token:      "some-refresh-token",
-        token_type:         "bearer",
-        created_at:         0
+             plaintext_token: "some-token",
+             expires_in: "3600",
+             expires_in_seconds: "300",
+             scopes_string: "two scopes",
+             plaintext_refresh_token: "some-refresh-token",
+             token_type: "bearer",
+             created_at: 0
     end
 
-    let(:client) { double :client, id: '1' }
+    let(:client) { double :client, id: "1" }
 
     let(:scopes_array) { %w[public write] }
 
     let(:server) do
       double :server,
-        access_token_expires_in: 100,
-        custom_access_token_expires_in: ->(_context) { nil },
-        refresh_token_enabled?: false
+             access_token_expires_in: 100,
+             custom_access_token_expires_in: ->(_context) { nil },
+             refresh_token_enabled?: false
+    end
+
+    before do
+      allow(server).to receive(:option_defined?).with(:custom_access_token_expires_in).and_return(true)
     end
 
     subject do
@@ -111,6 +117,9 @@ module Doorkeeper::OAuth
                         access_token_expires_in: 100,
                         custom_access_token_expires_in: ->(context) { context.scopes == "public" ? 500 : nil },
                         refresh_token_enabled?: false)
+
+        allow(server).to receive(:option_defined?).with(:custom_access_token_expires_in).and_return(true)
+
         result = subject.find_or_create_access_token(
           client,
           "1",
@@ -127,6 +136,9 @@ module Doorkeeper::OAuth
                         refresh_token_enabled?: lambda { |context|
                           context.scopes == "public"
                         })
+
+        allow(server).to receive(:option_defined?).with(:custom_access_token_expires_in).and_return(true)
+
         result = subject.find_or_create_access_token(
           client,
           "1",

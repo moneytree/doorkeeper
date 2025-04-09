@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Doorkeeper
   module Models
     module Revocable
@@ -23,7 +25,8 @@ module Doorkeeper
       #
       def revoke_previous_refresh_token!
         return unless refresh_token_revoked_on_use?
-        old_refresh_token.revoke if old_refresh_token
+
+        old_refresh_token&.revoke
         update_attribute :previous_refresh_token, ""
       end
 

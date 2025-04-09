@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Doorkeeper
   module Request
     class << self
@@ -31,7 +33,7 @@ module Doorkeeper
       end
 
       def build_strategy_class(grant_or_request_type)
-        strategy_class_name = grant_or_request_type.to_s.tr(' ', '_').camelize
+        strategy_class_name = grant_or_request_type.to_s.tr(" ", "_").camelize
         "Doorkeeper::Request::#{strategy_class_name}".constantize
       end
     end

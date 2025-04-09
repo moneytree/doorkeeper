@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Doorkeeper
   module Rails
     module Helpers
@@ -12,13 +14,15 @@ module Doorkeeper
       def doorkeeper_forbidden_render_options(**); end
 
       def valid_doorkeeper_token?
-        doorkeeper_token && doorkeeper_token.acceptable?(@_doorkeeper_scopes)
+        doorkeeper_token&.acceptable?(@_doorkeeper_scopes)
       end
 
       private
 
       def doorkeeper_render_error
         error = doorkeeper_error
+        error.raise_exception! if Doorkeeper.configuration.raise_on_errors?
+
         headers.merge!(error.headers.reject { |k| k == "Content-Type" })
         doorkeeper_render_error_with(error)
       end

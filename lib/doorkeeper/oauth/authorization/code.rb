@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Doorkeeper
   module OAuth
     module Authorization
@@ -14,7 +16,7 @@ module Doorkeeper
         end
 
         def native_redirect
-          { action: :show, code: token.token }
+          { action: :show, code: token.plaintext_token }
         end
 
         def configuration
@@ -40,7 +42,7 @@ module Doorkeeper
 
           {
             code_challenge: pre_auth.code_challenge,
-            code_challenge_method: pre_auth.code_challenge_method
+            code_challenge_method: pre_auth.code_challenge_method,
           }
         end
 

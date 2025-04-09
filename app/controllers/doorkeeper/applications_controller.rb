@@ -1,6 +1,8 @@
+# frozen_string_literal: true
+
 module Doorkeeper
   class ApplicationsController < Doorkeeper::ApplicationController
-    layout 'doorkeeper/admin' unless Doorkeeper.configuration.api_only
+    layout "doorkeeper/admin" unless Doorkeeper.configuration.api_only
 
     before_action :authenticate_admin!
     before_action :set_application, only: %i[show edit update destroy]
@@ -37,7 +39,11 @@ module Doorkeeper
       else
         respond_to do |format|
           format.html { render :new }
-          format.json { render json: { errors: @application.errors.full_messages }, status: :unprocessable_entity }
+          format.json do
+            errors = @application.errors.full_messages
+
+            render json: { errors: errors }, status: :unprocessable_entity
+          end
         end
       end
     end
@@ -46,7 +52,7 @@ module Doorkeeper
 
     def update
       if @application.update(application_params)
-        flash[:notice] = I18n.t(:notice, scope: %i[doorkeeper flash applications update])
+        flash[:notice] = I18n.t(:notice, scope: i18n_scope(:update))
 
         respond_to do |format|
           format.html { redirect_to oauth_application_url(@application) }
@@ -55,13 +61,17 @@ module Doorkeeper
       else
         respond_to do |format|
           format.html { render :edit }
-          format.json { render json: { errors: @application.errors.full_messages }, status: :unprocessable_entity }
+          format.json do
+            errors = @application.errors.full_messages
+
+            render json: { errors: errors }, status: :unprocessable_entity
+          end
         end
       end
     end
 
     def destroy
-      flash[:notice] = I18n.t(:notice, scope: %i[doorkeeper flash applications destroy]) if @application.destroy
+      flash[:notice] = I18n.t(:notice, scope: i18n_scope(:destroy)) if @application.destroy
 
       respond_to do |format|
         format.html { redirect_to oauth_applications_url }
@@ -76,8 +86,12 @@ module Doorkeeper
     end
 
     def application_params
-      params.require(:doorkeeper_application).
-        permit(:name, :redirect_uri, :scopes, :confidential)
+      params.require(:doorkeeper_application)
+        .permit(:name, :redirect_uri, :scopes, :confidential)
+    end
+
+    def i18n_scope(action)
+      %i[doorkeeper flash applications] << action
     end
   end
 end

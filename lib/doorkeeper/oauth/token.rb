@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Doorkeeper
   module OAuth
     class Token
@@ -53,11 +55,11 @@ module Doorkeeper
         end
 
         def token_from_header(header, pattern)
-          header.gsub pattern, ''
+          header.gsub pattern, ""
         end
 
         def match?(header, pattern)
-          header && header.match(pattern)
+          header&.match(pattern)
         end
       end
     end

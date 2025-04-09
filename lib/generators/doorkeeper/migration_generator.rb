@@ -1,18 +1,20 @@
 # frozen_string_literal: true
 
-require 'rails/generators'
-require 'rails/generators/active_record'
+require "rails/generators"
+require "rails/generators/active_record"
 
 module Doorkeeper
+  # Copies main Doorkeeper migration into parent Rails application.
+  #
   class MigrationGenerator < ::Rails::Generators::Base
     include ::Rails::Generators::Migration
-    source_root File.expand_path('templates', __dir__)
-    desc 'Installs Doorkeeper migration file.'
+    source_root File.expand_path("templates", __dir__)
+    desc "Installs Doorkeeper migration file."
 
     def install
       migration_template(
-        'migration.rb.erb',
-        'db/migrate/create_doorkeeper_tables.rb',
+        "migration.rb.erb",
+        "db/migrate/create_doorkeeper_tables.rb",
         migration_version: migration_version
       )
     end
@@ -24,9 +26,7 @@ module Doorkeeper
     private
 
     def migration_version
-      if ActiveRecord::VERSION::MAJOR >= 5
-        "[#{ActiveRecord::VERSION::MAJOR}.#{ActiveRecord::VERSION::MINOR}]"
-      end
+      "[#{ActiveRecord::VERSION::MAJOR}.#{ActiveRecord::VERSION::MINOR}]"
     end
   end
 end

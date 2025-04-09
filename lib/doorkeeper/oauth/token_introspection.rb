@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Doorkeeper
   module OAuth
     # RFC7662 OAuth 2.0 Token Introspection
@@ -18,7 +20,17 @@ module Doorkeeper
         @error.blank?
       end
 
-      def to_json
+      def error_response
+        return if @error.blank?
+
+        if @error == :invalid_token
+          OAuth::InvalidTokenResponse.from_access_token(authorized_token)
+        else
+          OAuth::ErrorResponse.new(name: @error)
+        end
+      end
+
+      def to_json(*)
         active? ? success_response : failure_response
       end
 
@@ -35,13 +47,29 @@ module Doorkeeper
       #
       # @see https://www.oauth.com/oauth2-servers/token-introspection-endpoint/
       #
+      # To prevent token scanning attacks, the endpoint MUST also require
+      # some form of authorization to access this endpoint, such as client
+      # authentication as described in OAuth 2.0 [RFC6749] or a separate
+      # OAuth 2.0 access token such as the bearer token described in OAuth
+      # 2.0 Bearer Token Usage [RFC6750].
+      #
       def authorize!
         # Requested client authorization
         if server.credentials
           @error = :invalid_client unless authorized_client
-        else
+        elsif authorized_token
           # Requested bearer token authorization
-          @error = :invalid_request unless authorized_token
+          #
+          #  If the protected resource uses an OAuth 2.0 bearer token to authorize
+          #  its call to the introspection endpoint and the token used for
+          #  authorization does not contain sufficient privileges or is otherwise
+          #  invalid for this request, the authorization server responds with an
+          #  HTTP 401 code as described in Section 3 of OAuth 2.0 Bearer Token
+          #  Usage [RFC6750].
+          #
+          @error = :invalid_token if authorized_token_matches_introspected? || !authorized_token.accessible?
+        else
+          @error = :invalid_request
         end
       end
 
@@ -58,14 +86,14 @@ module Doorkeeper
 
       # 2.2. Introspection Response
       def success_response
-        {
+        customize_response(
           active: true,
           scope: @token.scopes_string,
           client_id: @token.try(:application).try(:uid),
           token_type: @token.token_type,
           exp: @token.expires_at.to_i,
           iat: @token.created_at.to_i
-        }
+        )
       end
 
       # If the introspection call is properly authorized but the token is not
@@ -81,7 +109,7 @@ module Doorkeeper
       #
       def failure_response
         {
-          active: false
+          active: false,
         }
       end
 
@@ -101,6 +129,25 @@ module Doorkeeper
       # * The token expired
       # * The token was issued to a different client than is making this request
       #
+      # Since resource servers using token introspection rely on the
+      # authorization server to determine the state of a token, the
+      # authorization server MUST perform all applicable checks against a
+      # token's state.  For instance, these tests include the following:
+      #
+      #    o  If the token can expire, the authorization server MUST determine
+      #       whether or not the token has expired.
+      #    o  If the token can be issued before it is able to be used, the
+      #       authorization server MUST determine whether or not a token's valid
+      #       period has started yet.
+      #    o  If the token can be revoked after it was issued, the authorization
+      #       server MUST determine whether or not such a revocation has taken
+      #       place.
+      #    o  If the token has been signed, the authorization server MUST
+      #       validate the signature.
+      #    o  If the token can be used only at certain resource servers, the
+      #       authorization server MUST determine whether or not the token can
+      #       be used at the resource server making the introspection call.
+      #
       def active?
         if authorized_client
           valid_token? && authorized_for_client?
@@ -111,17 +158,38 @@ module Doorkeeper
 
       # Token can be valid only if it is not expired or revoked.
       def valid_token?
-        @token.present? && @token.accessible?
+        @token&.accessible?
+      end
+
+      # RFC7662 Section 2.1
+      def authorized_token_matches_introspected?
+        authorized_token.token == @token&.token
       end
 
       # If token doesn't belong to some client, then it is public.
       # Otherwise in it required for token to be connected to the same client.
       def authorized_for_client?
-        if @token.application.present?
+        if @token.application
           @token.application == authorized_client.application
         else
           true
         end
+      end
+
+      # Allows to customize introspection response.
+      # Provides context (controller) and token for generating developer-specific
+      # response.
+      #
+      # @see https://tools.ietf.org/html/rfc7662#section-2.2
+      #
+      def customize_response(response)
+        customized_response = Doorkeeper.configuration.custom_introspection_response.call(
+          token,
+          server.context
+        )
+        return response if customized_response.blank?
+
+        response.merge(customized_response)
       end
     end
   end

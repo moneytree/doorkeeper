@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Doorkeeper
   module OAuth
     class ClientCredentialsRequest < BaseRequest
@@ -5,7 +7,7 @@ module Doorkeeper
       attr_reader :response
       attr_writer :issuer
 
-      alias_method :error_response, :response
+      alias error_response response
 
       delegate :error, to: :issuer
 

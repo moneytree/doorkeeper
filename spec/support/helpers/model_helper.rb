@@ -1,21 +1,27 @@
+# frozen_string_literal: true
+
 module ModelHelper
   def client_exists(client_attributes = {})
     @client = FactoryBot.create(:application, client_attributes)
   end
 
   def create_resource_owner
-    @resource_owner = User.create!(name: 'Joe', password: 'sekret')
+    @resource_owner = User.create!(name: "Joe", password: "sekret")
   end
 
   def authorization_code_exists(options = {})
     @authorization = FactoryBot.create(:access_grant, options)
   end
 
+  def access_token_exists(options = {})
+    @access_token = FactoryBot.create(:access_token, options)
+  end
+
   def access_grant_should_exist_for(client, resource_owner)
     grant = Doorkeeper::AccessGrant.first
 
-    expect(grant.application).to have_attributes(id: client.id).
-      and(be_instance_of(Doorkeeper::Application))
+    expect(grant.application).to have_attributes(id: client.id)
+      .and(be_instance_of(Doorkeeper::Application))
 
     expect(grant.resource_owner_id).to eq(resource_owner.id)
   end
@@ -23,8 +29,8 @@ module ModelHelper
   def access_token_should_exist_for(client, resource_owner)
     token = Doorkeeper::AccessToken.first
 
-    expect(token.application).to have_attributes(id: client.id).
-      and(be_instance_of(Doorkeeper::Application))
+    expect(token.application).to have_attributes(id: client.id)
+      .and(be_instance_of(Doorkeeper::Application))
 
     expect(token.resource_owner_id).to eq(resource_owner.id)
   end

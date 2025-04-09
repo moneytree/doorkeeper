@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Doorkeeper
   module OAuth
     class Client
@@ -16,7 +18,7 @@ module Doorkeeper
       end
 
       def self.authenticate(credentials, method = Doorkeeper.configuration.application_model.method(:by_uid_and_secret))
-        return false if credentials.blank?
+        return if credentials.blank?
 
         if (application = method.call(credentials.uid, credentials.secret))
           new(application)

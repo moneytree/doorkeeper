@@ -1,11 +1,15 @@
+# frozen_string_literal: true
+
 module Doorkeeper
   module ApplicationMixin
     extend ActiveSupport::Concern
 
     include OAuth::Helpers
     include Models::Orderable
+    include Models::SecretStorable
     include Models::Scopes
 
+    # :nodoc
     module ClassMethods
       # Returns an instance of the Doorkeeper::Application with
       # specific UID and secret.
@@ -23,7 +27,8 @@ module Doorkeeper
         app = by_uid(uid)
         return unless app
         return app if secret.blank? && !app.confidential?
-        return unless app.secret == secret
+        return unless app.secret_matches?(secret)
+
         app
       end
 
@@ -37,6 +42,20 @@ module Doorkeeper
       def by_uid(uid)
         find_by(uid: uid.to_s)
       end
+
+      ##
+      # Determines the secret storing transformer
+      # Unless configured otherwise, uses the plain secret strategy
+      def secret_strategy
+        ::Doorkeeper.configuration.application_secret_strategy
+      end
+
+      ##
+      # Determine the fallback storing strategy
+      # Unless configured, there will be no fallback
+      def fallback_secret_strategy
+        ::Doorkeeper.configuration.application_secret_fallback_strategy
+      end
     end
 
     # Set an application's valid redirect URIs.
@@ -46,6 +65,31 @@ module Doorkeeper
     # @return [String] The redirect URI(s) seperated by newlines.
     def redirect_uri=(uris)
       super(uris.is_a?(Array) ? uris.join("\n") : uris)
+    end
+
+    # Check whether the given plain text secret matches our stored secret
+    #
+    # @param input [#to_s] Plain secret provided by user
+    #        (any object that responds to `#to_s`)
+    #
+    # @return [true] Whether the given secret matches the stored secret
+    #                of this application.
+    #
+    def secret_matches?(input)
+      # return false if either is nil, since secure_compare depends on strings
+      # but Application secrets MAY be nil depending on confidentiality.
+      return false if input.nil? || secret.nil?
+
+      # When matching the secret by comparer function, all is well.
+      return true if secret_strategy.secret_matches?(input, secret)
+
+      # When fallback lookup is enabled, ensure applications
+      # with plain secrets can still be found
+      if fallback_secret_strategy
+        fallback_secret_strategy.secret_matches?(input, secret)
+      else
+        false
+      end
     end
   end
 end

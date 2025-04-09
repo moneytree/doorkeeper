@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Doorkeeper
   CVE_2018_1000211_WARNING = <<-HEREDOC.freeze
 
@@ -27,11 +29,11 @@ HEREDOC
   module VERSION
     # Semantic versioning
     MAJOR = 5
-    MINOR = 0
+    MINOR = 1
     TINY = 0
     PRE = nil
 
     # Full version number
-    STRING = [MAJOR, MINOR, TINY, PRE].compact.join('.')
+    STRING = [MAJOR, MINOR, TINY, PRE].compact.join(".")
   end
 end
