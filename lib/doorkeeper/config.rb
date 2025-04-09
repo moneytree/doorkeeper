@@ -25,8 +25,8 @@ module Doorkeeper
 
   def self.setup_orm_adapter
     @orm_adapter = "doorkeeper/orm/#{configuration.orm}".classify.constantize
-  rescue NameError => error
-    raise error, "ORM adapter not found (#{configuration.orm})", <<-ERROR_MSG.strip_heredoc
+  rescue NameError => e
+    raise e, "ORM adapter not found (#{configuration.orm})", <<-ERROR_MSG.strip_heredoc
       [doorkeeper] ORM adapter not found (#{configuration.orm}), or there was an error
       trying to load it.
 
@@ -129,14 +129,6 @@ module Doorkeeper
       # Rationale: https://github.com/doorkeeper-gem/doorkeeper/issues/383
       def reuse_access_token
         @config.instance_variable_set(:@reuse_access_token, true)
-      end
-
-      # The controller Doorkeeper::ApplicationMetalController inherits from.
-      # Defaults to ActionController::Metal.
-      #
-      # @param base_metal_controller [String] the name of the base controller
-      def base_metal_controller(base_metal_controller)
-        @config.instance_variable_set('@base_metal_controller', base_metal_controller)
       end
 
       # Sets the token_reuse_limit
@@ -262,10 +254,37 @@ module Doorkeeper
     option :custom_access_token_expires_in, default: ->(_context) { nil }
     option :authorization_code_expires_in,  default: 600
     option :orm,                            default: :active_record
-    option :native_redirect_uri,            default: "urn:ietf:wg:oauth:2.0:oob"
+    option :native_redirect_uri,            default: "urn:ietf:wg:oauth:2.0:oob", deprecated: true
     option :active_record_options,          default: {}
     option :grant_flows,                    default: %w[authorization_code client_credentials]
     option :handle_auth_errors,             default: :render
+    option :token_lookup_batch_size,        default: 10_000
+
+    # Allows to customize OAuth grant flows that +each+ application support.
+    # You can configure a custom block (or use a class respond to `#call`) that must
+    # return `true` in case Application instance supports requested OAuth grant flow
+    # during the authorization request to the server. This configuration +doesn't+
+    # set flows per application, it only allows to check if application supports
+    # specific grant flow.
+    #
+    # For example you can add an additional database column to `oauth_applications` table,
+    # say `t.array :grant_flows, default: []`, and store allowed grant flows that can
+    # be used with this application there. Then when authorization requested Doorkeeper
+    # will call this block to check if specific Application (passed with client_id and/or
+    # client_secret) is allowed to perform the request for the specific grant type
+    # (authorization, password, client_credentials, etc).
+    #
+    # Example of the block:
+    #
+    #   ->(flow, client) { client.grant_flows.include?(flow) }
+    #
+    # In case this option invocation result is `false`, Doorkeeper server returns
+    # :unauthorized_client error and stops the request.
+    #
+    # @param allow_grant_flow_for_client [Proc] Block or any object respond to #call
+    # @return [Boolean] `true` if allow or `false` if forbid the request
+    #
+    option :allow_grant_flow_for_client,    default: ->(_grant_flow, _client) { true }
 
     # Allows to forbid specific Application redirect URI's by custom rules.
     # Doesn't forbid any URI by default.
@@ -296,7 +315,7 @@ module Doorkeeper
     option :force_ssl_in_redirect_uri,      default: !Rails.env.development?
 
     # Use a custom class for generating the access token.
-    # https://github.com/doorkeeper-gem/doorkeeper#custom-access-token-generator
+    # https://doorkeeper.gitbook.io/guides/configuration/other-configurations#custom-access-token-generator
     #
     # @param access_token_generator [String]
     #   the name of the access token generator class
@@ -314,20 +333,28 @@ module Doorkeeper
 
     # The controller Doorkeeper::ApplicationController inherits from.
     # Defaults to ActionController::Base.
-    # https://github.com/doorkeeper-gem/doorkeeper#custom-base-controller
+    # https://doorkeeper.gitbook.io/guides/configuration/other-configurations#custom-base-controller
     #
     # @param base_controller [String] the name of the base controller
     option :base_controller,
-           default: "ActionController::Base"
+           default: (lambda do
+             api_only ? "ActionController::API" : "ActionController::Base"
+           end)
+
+    # The controller Doorkeeper::ApplicationMetalController inherits from.
+    # Defaults to ActionController::API.
+    #
+    # @param base_metal_controller [String] the name of the base controller
     option :base_metal_controller,
-           default: "ActionController::Metal"
+           default: "ActionController::API"
+
     option :access_token_class,
            default: "Doorkeeper::AccessToken"
     option :access_grant_class,
            default: "Doorkeeper::AccessGrant"
     option :application_class,
            default: "Doorkeeper::Application"
-
+    
     # Allows to set blank redirect URIs for Applications in case
     # server configured to use URI-less grant flows.
     #
@@ -335,6 +362,36 @@ module Doorkeeper
            default: (lambda do |grant_flows, _application|
              grant_flows.exclude?("authorization_code") &&
                grant_flows.exclude?("implicit")
+           end)
+
+    # Configure protection of token introspection request.
+    # By default this configuration allows to introspect a token by
+    # another token of the same application, or to introspect the token
+    # that belongs to authorized client, or access token has been introspected
+    # is a public one (doesn't belong to any client)
+    #
+    # You can define any custom rule you need or just disable token
+    # introspection at all.
+    #
+    # @param token [Doorkeeper::AccessToken]
+    #   token to be introspected
+    #
+    # @param authorized_client [Doorkeeper::Application]
+    #   authorized client (if request is authorized using Basic auth with
+    #   Client Credentials for example)
+    #
+    # @param authorized_token [Doorkeeper::AccessToken]
+    #   Bearer token used to authorize the request
+    #
+    option :allow_token_introspection,
+           default: (lambda do |token, authorized_client, authorized_token|
+             if authorized_token
+               authorized_token.application == token&.application
+             elsif token.application
+               authorized_client == token.application
+             else
+               true
+             end
            end)
 
     attr_reader :api_only,
@@ -380,6 +437,17 @@ module Doorkeeper
 
     def token_reuse_limit
       @token_reuse_limit ||= 100
+    end
+
+    def resolve_controller(name)
+      config_option = public_send(:"#{name}_controller")
+      controller_name = if config_option.respond_to?(:call)
+                          instance_exec(&config_option)
+                        else
+                          config_option
+                        end
+
+      controller_name.constantize
     end
 
     def enforce_configured_scopes?
@@ -453,6 +521,12 @@ module Doorkeeper
       else
         allow_blank_redirect_uri
       end
+    end
+
+    def allow_grant_flow_for_client?(grant_flow, client)
+      return true unless option_defined?(:allow_grant_flow_for_client)
+
+      allow_grant_flow_for_client.call(grant_flow, client)
     end
 
     def option_defined?(name)

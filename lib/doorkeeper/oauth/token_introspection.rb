@@ -7,7 +7,7 @@ module Doorkeeper
     # @see https://tools.ietf.org/html/rfc7662
     class TokenIntrospection
       attr_reader :server, :token
-      attr_reader :error
+      attr_reader :error, :invalid_request_reason
 
       def initialize(server, token)
         @server = server
@@ -25,6 +25,8 @@ module Doorkeeper
 
         if @error == :invalid_token
           OAuth::InvalidTokenResponse.from_access_token(authorized_token)
+        elsif @error == :invalid_request
+          OAuth::InvalidRequestResponse.from_request(self)
         else
           OAuth::ErrorResponse.new(name: @error)
         end
@@ -67,9 +69,10 @@ module Doorkeeper
           #  HTTP 401 code as described in Section 3 of OAuth 2.0 Bearer Token
           #  Usage [RFC6750].
           #
-          @error = :invalid_token if authorized_token_matches_introspected? || !authorized_token.accessible?
+          @error = :invalid_token unless valid_authorized_token?
         else
           @error = :invalid_request
+          @invalid_request_reason = :request_not_authorized
         end
       end
 
@@ -80,8 +83,7 @@ module Doorkeeper
 
       # Bearer Token Authentication
       def authorized_token
-        @authorized_token ||=
-          OAuth::Token.authenticate(server.context.request, :from_bearer_authorization)
+        @authorized_token ||= Doorkeeper.authenticate(server.context.request)
       end
 
       # 2.2. Introspection Response
@@ -150,7 +152,7 @@ module Doorkeeper
       #
       def active?
         if authorized_client
-          valid_token? && authorized_for_client?
+          valid_token? && token_introspection_allowed?(auth_client: authorized_client.application)
         else
           valid_token?
         end
@@ -161,19 +163,27 @@ module Doorkeeper
         @token&.accessible?
       end
 
+      def valid_authorized_token?
+        !authorized_token_matches_introspected? &&
+          authorized_token.accessible? &&
+          token_introspection_allowed?(auth_token: authorized_token)
+      end
+
       # RFC7662 Section 2.1
       def authorized_token_matches_introspected?
         authorized_token.token == @token&.token
       end
 
-      # If token doesn't belong to some client, then it is public.
-      # Otherwise in it required for token to be connected to the same client.
-      def authorized_for_client?
-        if @token.application
-          @token.application == authorized_client.application
-        else
-          true
-        end
+      # config constraints for introspection in Doorkeeper.configuration.allow_token_introspection
+      def token_introspection_allowed?(auth_client: nil, auth_token: nil)
+        allow_introspection = Doorkeeper.configuration.allow_token_introspection
+        return allow_introspection unless allow_introspection.respond_to?(:call)
+
+        allow_introspection.call(
+          @token,
+          auth_client,
+          auth_token
+        )
       end
 
       # Allows to customize introspection response.

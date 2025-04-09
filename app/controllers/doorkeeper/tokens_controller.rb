@@ -6,8 +6,8 @@ module Doorkeeper
       headers.merge!(authorize_response.headers)
       render json: authorize_response.body,
              status: authorize_response.status
-    rescue Errors::DoorkeeperError => error
-      handle_token_exception(error)
+    rescue Errors::DoorkeeperError => e
+      handle_token_exception(e)
     end
 
     # OAuth 2.0 Token Revocation - http://tools.ietf.org/html/rfc7009
@@ -18,12 +18,13 @@ module Doorkeeper
       # Doorkeeper does not use the token_type_hint logic described in the
       # RFC 7009 due to the refresh token implementation that is a field in
       # the access token model.
-      revoke_token if authorized?
 
-      # The authorization server responds with HTTP status code 200 if the token
-      # has been revoked successfully or if the client submitted an invalid
-      # token
-      render json: {}, status: 200
+      if authorized?
+        revoke_token
+        render json: {}, status: 200
+      else
+        render json: revocation_error_response, status: :forbidden
+      end
     end
 
     def introspect
@@ -71,7 +72,10 @@ module Doorkeeper
     end
 
     def revoke_token
-      token.revoke if token.accessible?
+      # The authorization server responds with HTTP status code 200 if the token
+      # has been revoked successfully or if the client submitted an invalid
+      # token
+      token.revoke if token&.accessible?
     end
 
     def token
@@ -84,7 +88,26 @@ module Doorkeeper
     end
 
     def authorize_response
-      @authorize_response ||= strategy.authorize
+      @authorize_response ||= begin
+        before_successful_authorization
+        auth = strategy.authorize
+        after_successful_authorization unless auth.is_a?(Doorkeeper::OAuth::ErrorResponse)
+        auth
+      end
+    end
+
+    def after_successful_authorization
+      Doorkeeper.configuration.after_successful_authorization.call(self)
+    end
+
+    def before_successful_authorization
+      Doorkeeper.configuration.before_successful_authorization.call(self)
+    end
+
+    def revocation_error_response
+      error_description = I18n.t(:unauthorized, scope: %i[doorkeeper errors messages revoke])
+
+      { error: :unauthorized_client, error_description: error_description }
     end
   end
 end

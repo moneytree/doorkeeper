@@ -21,10 +21,11 @@ Supported features:
   - [Implicit grant](http://tools.ietf.org/html/draft-ietf-oauth-v2-22#section-4.2)
   - [Resource Owner Password Credentials](http://tools.ietf.org/html/draft-ietf-oauth-v2-22#section-4.3)
   - [Client Credentials](http://tools.ietf.org/html/draft-ietf-oauth-v2-22#section-4.4)
-  - [Proof Key for Code Exchange](https://tools.ietf.org/html/rfc7636)
 - [OAuth 2.0 Token Revocation](http://tools.ietf.org/html/rfc7009)
 - [OAuth 2.0 Token Introspection](https://tools.ietf.org/html/rfc7662)
 - [OAuth 2.0 Threat Model and Security Considerations](http://tools.ietf.org/html/rfc6819)
+- [OAuth 2.0 for Native Apps](https://tools.ietf.org/html/draft-ietf-oauth-native-apps-10)
+- [Proof Key for Code Exchange by OAuth Public Clients](https://tools.ietf.org/html/rfc7636)
 
 ## Table of Contents
 
@@ -93,6 +94,7 @@ Doorkeeper supports Active Record by default, but can be configured to work with
 | MongoDB | [doorkeeper-gem/doorkeeper-mongodb](https://github.com/doorkeeper-gem/doorkeeper-mongodb) |
 | Sequel | [nbulaj/doorkeeper-sequel](https://github.com/nbulaj/doorkeeper-sequel) |
 | Couchbase | [acaprojects/doorkeeper-couchbase](https://github.com/acaprojects/doorkeeper-couchbase) |
+| RethinkDB | [aca-labs/doorkeeper-rethinkdb](https://github.com/aca-labs/doorkeeper-rethinkdb) |
 
 ## Extensions
 
@@ -136,6 +138,12 @@ Support this project by becoming a sponsor. Your logo will show up here with a l
 
 > If you prefer not to deal with the gory details of OAuth 2, need dedicated customer support & consulting, try the cloud-based SaaS version: [https://oauth.io](https://oauth.io/?utm_source=doorkeeper-gem)
 
+<br>
+
+<a href="https://www.wealthsimple.com/?utm_source=doorkeeper-gem" target="_blank"><img src="https://wealthsimple.s3.amazonaws.com/branding/medium-black.svg"/></a>
+
+> Wealthsimple is a financial company on a mission to help everyone achieve financial freedom by providing products and advice that are accessible and affordable. Using smart technology, Wealthsimple takes financial services that are often confusing, opaque and expensive and makes them simple, transparent, and low-cost. See what Investing on Autopilot is all about: [https://www.wealthsimple.com](https://www.wealthsimple.com/?utm_source=doorkeeper-gem)
+
 ## Development
 
 To run the local engine server:
@@ -146,10 +154,10 @@ bundle exec rake doorkeeper:server
 ````
 
 By default, it uses the latest Rails version with ActiveRecord. To run the
-tests with a specific ORM and Rails version:
+tests with a specific Rails version:
 
 ```
-rails=5.2 orm=active_record bundle exec rake
+BUNDLE_GEMFILE=gemfiles/rails_6_0.gemfile bundle exec rake
 ```
 
 ## Contributing

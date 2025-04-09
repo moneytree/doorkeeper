@@ -8,18 +8,6 @@ module Doorkeeper
       end
     end
 
-    class InvalidAuthorizationStrategy < DoorkeeperError
-      def type
-        :unsupported_response_type
-      end
-    end
-
-    class InvalidTokenReuse < DoorkeeperError
-      def type
-        :invalid_request
-      end
-    end
-
     class InvalidGrantReuse < DoorkeeperError
       def type
         :invalid_grant
@@ -32,7 +20,14 @@ module Doorkeeper
       end
     end
 
-    class MissingRequestStrategy < DoorkeeperError
+    class MissingRequiredParameter < DoorkeeperError
+      attr_reader :missing_param
+
+      def initialize(missing_param)
+        super
+        @missing_param = missing_param
+      end
+
       def type
         :invalid_request
       end
@@ -50,10 +45,10 @@ module Doorkeeper
     TokenGeneratorNotFound = Class.new(DoorkeeperError)
     NoOrmCleaner = Class.new(DoorkeeperError)
 
-    InvalidToken = Class.new BaseResponseError
-    TokenExpired = Class.new InvalidToken
-    TokenRevoked = Class.new InvalidToken
-    TokenUnknown = Class.new InvalidToken
-    TokenForbidden = Class.new InvalidToken
+    InvalidToken = Class.new(BaseResponseError)
+    TokenExpired = Class.new(InvalidToken)
+    TokenRevoked = Class.new(InvalidToken)
+    TokenUnknown = Class.new(InvalidToken)
+    TokenForbidden = Class.new(InvalidToken)
   end
 end

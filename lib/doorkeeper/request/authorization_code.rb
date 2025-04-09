@@ -17,6 +17,8 @@ module Doorkeeper
       private
 
       def grant
+        raise Errors::MissingRequiredParameter, :code if parameters[:code].blank?
+
         Doorkeeper.configuration.access_grant_model.by_token(parameters[:code])
       end
     end

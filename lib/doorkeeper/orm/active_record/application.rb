@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "doorkeeper/orm/active_record/redirect_uri_validator"
+
 module Doorkeeper
   class Application < ActiveRecord::Base
     self.table_name = "#{table_name_prefix}oauth_applications#{table_name_suffix}"
@@ -10,8 +12,8 @@ module Doorkeeper
     has_many :access_tokens, dependent: :delete_all, class_name: Doorkeeper.configuration.access_token_class
 
     validates :name, :secret, :uid, presence: true
-    validates :uid, uniqueness: true
-    validates :redirect_uri, redirect_uri: true
+    validates :uid, uniqueness: { case_sensitive: true }
+    validates :redirect_uri, "doorkeeper/redirect_uri": true
     validates :confidential, inclusion: { in: [true, false] }
 
     validate :scopes_match_configured, if: :enforce_scopes?
@@ -46,6 +48,14 @@ module Doorkeeper
       Doorkeeper.configuration.access_grant_class.revoke_all_for(id, resource_owner)
     end
 
+    # Generates a new secret for this application, intended to be used
+    # for rotating the secret or in case of compromise.
+    #
+    def renew_secret
+      @raw_secret = UniqueToken.generate
+      secret_strategy.store_secret(self, :secret, @raw_secret)
+    end
+
     # We keep a volatile copy of the raw secret for initial communication
     # The stored refresh_token may be mapped and not available in cleartext.
     #
@@ -60,6 +70,29 @@ module Doorkeeper
       end
     end
 
+    # Represents client as set of it's attributes in JSON format.
+    # This is the right way how we want to override ActiveRecord #to_json.
+    #
+    # Respects privacy settings and serializes minimum set of attributes
+    # for public/private clients and full set for authorized owners.
+    #
+    # @return [Hash] entity attributes for JSON
+    #
+    def as_json(options = {})
+      # if application belongs to some owner we need to check if it's the same as
+      # the one passed in the options or check if we render the client as an owner
+      if (respond_to?(:owner) && owner && owner == options[:current_resource_owner]) ||
+         options[:as_owner]
+        # Owners can see all the client attributes, fallback to ActiveModel serialization
+        super
+      else
+        # if application has no owner or it's owner doesn't match one from the options
+        # we render only minimum set of attributes that could be exposed to a public
+        only = extract_serializable_attributes(options)
+        super(options.merge(only: only))
+      end
+    end
+
     private
 
     def generate_uid
@@ -68,9 +101,7 @@ module Doorkeeper
 
     def generate_secret
       return unless secret.blank?
-
-      @raw_secret = UniqueToken.generate
-      secret_strategy.store_secret(self, :secret, @raw_secret)
+      renew_secret
     end
 
     def scopes_match_configured
@@ -83,6 +114,49 @@ module Doorkeeper
 
     def enforce_scopes?
       Doorkeeper.configuration.enforce_configured_scopes?
+    end
+
+    # Helper method to extract collection of serializable attribute names
+    # considering serialization options (like `only`, `except` and so on).
+    #
+    # @param options [Hash] serialization options
+    #
+    # @return [Array<String>]
+    #   collection of attributes to be serialized using #as_json
+    #
+    def extract_serializable_attributes(options = {})
+      opts = options.try(:dup) || {}
+      only = Array.wrap(opts[:only]).map(&:to_s)
+
+      only = if only.blank?
+               serializable_attributes
+             else
+               only & serializable_attributes
+             end
+
+      only -= Array.wrap(opts[:except]).map(&:to_s) if opts.key?(:except)
+      only.uniq
+    end
+
+    # We need to hook into this method to allow serializing plan-text secrets
+    # when secrets hashing enabled.
+    #
+    # @param key [String] attribute name
+    #
+    def read_attribute_for_serialization(key)
+      return super unless key.to_s == "secret"
+
+      plaintext_secret || secret
+    end
+
+    # Collection of attributes that could be serialized for public.
+    # Override this method if you need additional attributes to be serialized.
+    #
+    # @return [Array<String>] collection of serializable attributes
+    def serializable_attributes
+      attributes = %w[id name created_at]
+      attributes << "uid" unless confidential?
+      attributes
     end
   end
 end

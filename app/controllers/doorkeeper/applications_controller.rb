@@ -19,7 +19,7 @@ module Doorkeeper
     def show
       respond_to do |format|
         format.html
-        format.json { render json: @application }
+        format.json { render json: @application, as_owner: true }
       end
     end
 
@@ -31,10 +31,11 @@ module Doorkeeper
       @application = Doorkeeper.configuration.application_model.new(application_params)
       if @application.save
         flash[:notice] = I18n.t(:notice, scope: %i[doorkeeper flash applications create])
+        flash[:application_secret] = @application.plaintext_secret
 
         respond_to do |format|
           format.html { redirect_to oauth_application_url(@application) }
-          format.json { render json: @application }
+          format.json { render json: @application, as_owner: true }
         end
       else
         respond_to do |format|
@@ -56,7 +57,7 @@ module Doorkeeper
 
         respond_to do |format|
           format.html { redirect_to oauth_application_url(@application) }
-          format.json { render json: @application }
+          format.json { render json: @application, as_owner: true }
         end
       else
         respond_to do |format|

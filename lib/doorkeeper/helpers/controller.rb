@@ -4,6 +4,8 @@
 # Doorkeeper::ApplicationMetalController or Doorkeeper::ApplicationController
 module Doorkeeper
   module Helpers
+    # Rails controller helpers.
+    #
     module Controller
       private
 
@@ -14,7 +16,9 @@ module Doorkeeper
 
       # :doc:
       def current_resource_owner
-        instance_eval(&Doorkeeper.configuration.authenticate_resource_owner)
+        @current_resource_owner ||= begin
+          instance_eval(&Doorkeeper.configuration.authenticate_resource_owner)
+        end
       end
 
       def resource_owner_from_credentials
@@ -40,7 +44,15 @@ module Doorkeeper
       end
 
       def get_error_response_from_exception(exception)
-        OAuth::ErrorResponse.new name: exception.type, state: params[:state]
+        if exception.respond_to?(:response)
+          exception.response
+        elsif exception.type == :invalid_request
+          OAuth::InvalidRequestResponse.new(name: exception.type,
+                                            state: params[:state],
+                                            missing_param: exception.missing_param)
+        else
+          OAuth::ErrorResponse.new(name: exception.type, state: params[:state])
+        end
       end
 
       def handle_token_exception(exception)
@@ -51,13 +63,20 @@ module Doorkeeper
       end
 
       def skip_authorization?
-        !!instance_exec([@server.current_resource_owner, @pre_auth.client], &Doorkeeper.configuration.skip_authorization)
+        !!instance_exec(
+          [server.current_resource_owner, @pre_auth.client],
+          &Doorkeeper.configuration.skip_authorization
+        )
       end
 
       def enforce_content_type
-        if (request.put? || request.post? || request.patch?) && request.content_type != "application/x-www-form-urlencoded"
+        if (request.put? || request.post? || request.patch?) && !x_www_form_urlencoded?
           render json: {}, status: :unsupported_media_type
         end
+      end
+
+      def x_www_form_urlencoded?
+        request.content_type == "application/x-www-form-urlencoded"
       end
     end
   end

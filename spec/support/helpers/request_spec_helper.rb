@@ -54,7 +54,7 @@ module RequestSpecHelper
   end
 
   def with_header(header, value)
-    page.driver.header header, value
+    page.driver.header(header, value)
   end
 
   def basic_auth_header_for_client(client)
@@ -90,8 +90,20 @@ module RequestSpecHelper
     i_should_see translated_error_message(key)
   end
 
+  def i_should_not_see_translated_error_message(key)
+    i_should_not_see translated_error_message(key)
+  end
+
   def translated_error_message(key)
-    I18n.translate key, scope: %i[doorkeeper errors messages]
+    I18n.translate(key, scope: %i[doorkeeper errors messages])
+  end
+
+  def i_should_see_translated_invalid_request_error_message(key, value)
+    i_should_see translated_invalid_request_error_message(key, value)
+  end
+
+  def translated_invalid_request_error_message(key, value)
+    I18n.translate key, scope: %i[doorkeeper errors messages invalid_request], value: value
   end
 
   def response_status_should_be(status)

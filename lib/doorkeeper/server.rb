@@ -10,12 +10,12 @@ module Doorkeeper
 
     def authorization_request(strategy)
       klass = Request.authorization_strategy strategy
-      klass.new self
+      klass.new(self)
     end
 
     def token_request(strategy)
       klass = Request.token_strategy strategy
-      klass.new self
+      klass.new(self)
     end
 
     # TODO: context should be the request
@@ -25,10 +25,6 @@ module Doorkeeper
 
     def client
       @client ||= OAuth::Client.authenticate(credentials)
-    end
-
-    def client_via_uid
-      @client_via_uid ||= OAuth::Client.find(parameters[:client_id])
     end
 
     def current_resource_owner

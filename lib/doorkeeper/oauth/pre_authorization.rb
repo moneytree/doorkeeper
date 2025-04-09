@@ -5,20 +5,21 @@ module Doorkeeper
     class PreAuthorization
       include Validations
 
-      validate :response_type, error: :unsupported_response_type
-      validate :client, error: :invalid_client
-      validate :scopes, error: :invalid_scope
-      validate :redirect_uri, error: :invalid_redirect_uri
+      validate :client_id,             error: :invalid_request
+      validate :client,                error: :invalid_client
+      validate :redirect_uri,          error: :invalid_redirect_uri
+      validate :params,                error: :invalid_request
+      validate :response_type,         error: :unsupported_response_type
+      validate :scopes,                error: :invalid_scope
       validate :code_challenge_method, error: :invalid_code_challenge_method
+      validate :client_supports_grant_flow, error: :unauthorized_client
 
-      attr_accessor :server, :client, :response_type, :redirect_uri, :state,
-                    :code_challenge, :code_challenge_method
+      attr_reader :server, :client_id, :client, :redirect_uri, :response_type, :state,
+                  :code_challenge, :code_challenge_method, :missing_param
 
-      attr_writer   :scope
-
-      def initialize(server, client, attrs = {})
+      def initialize(server, attrs = {})
         @server                = server
-        @client                = client
+        @client_id             = attrs[:client_id]
         @response_type         = attrs[:response_type]
         @redirect_uri          = attrs[:redirect_uri]
         @scope                 = attrs[:scope]
@@ -31,34 +32,41 @@ module Doorkeeper
         valid?
       end
 
+      def validate_client_supports_grant_flow
+        Doorkeeper.configuration.allow_grant_flow_for_client?(grant_type, client.application)
+      end
+
       def scopes
         Scopes.from_string scope
       end
 
       def scope
-        @scope.presence || build_scopes
+        @scope.presence || (server.default_scopes.presence && build_scopes)
       end
 
       def error_response
-        OAuth::ErrorResponse.from_request(self)
+        if error == :invalid_request
+          OAuth::InvalidRequestResponse.from_request(self,
+                                                     response_on_fragment: response_on_fragment?)
+        else
+          OAuth::ErrorResponse.from_request(self, response_on_fragment: response_on_fragment?)
+        end
       end
 
-      def as_json(_options)
-        {
-          client_id: client.uid,
-          redirect_uri: redirect_uri,
-          state: state,
-          response_type: response_type,
-          scope: scope,
-          client_name: client.name,
-          status: I18n.t("doorkeeper.pre_authorization.status"),
-        }
+      def as_json(attributes = {})
+        return pre_auth_hash.merge(attributes.to_h) if attributes.respond_to?(:to_h)
+
+        pre_auth_hash
       end
 
       private
 
       def build_scopes
+<<<<<<< HEAD
         client_scopes = client&.application&.scopes
+=======
+        client_scopes = client.scopes
+>>>>>>> v5.2.5
         if client_scopes.blank?
           server.default_scopes.to_s
         else
@@ -66,27 +74,15 @@ module Doorkeeper
         end
       end
 
-      def validate_response_type
-        server.authorization_response_types.include? response_type
+      def validate_client_id
+        @missing_param = :client_id if client_id.blank?
+
+        @missing_param.nil?
       end
 
       def validate_client
-        client.present?
-      end
-
-      def validate_scopes
-        return true if scope.blank?
-
-        Helpers::ScopeChecker.valid?(
-          scope_str: scope,
-          server_scopes: server.scopes,
-          app_scopes: client.application.scopes,
-          grant_type: grant_type
-        )
-      end
-
-      def grant_type
-        response_type == "code" ? AUTHORIZATION_CODE : IMPLICIT
+        @client = OAuth::Client.find(client_id)
+        @client.present?
       end
 
       def validate_redirect_uri
@@ -98,9 +94,52 @@ module Doorkeeper
         )
       end
 
+      def validate_params
+        @missing_param = if response_type.blank?
+                           :response_type
+                         elsif @scope.blank? && server.default_scopes.blank?
+                           :scope
+                         end
+
+        @missing_param.nil?
+      end
+
+      def validate_response_type
+        server.authorization_response_types.include?(response_type)
+      end
+
+      def validate_scopes
+        Helpers::ScopeChecker.valid?(
+          scope_str: scope,
+          server_scopes: server.scopes,
+          app_scopes: client.scopes,
+          grant_type: grant_type
+        )
+      end
+
+      def grant_type
+        response_type == "code" ? AUTHORIZATION_CODE : IMPLICIT
+      end
+
       def validate_code_challenge_method
         code_challenge.blank? ||
           (code_challenge_method.present? && code_challenge_method =~ /^plain$|^S256$/)
+      end
+
+      def response_on_fragment?
+        response_type == "token"
+      end
+
+      def pre_auth_hash
+        {
+          client_id: client.uid,
+          redirect_uri: redirect_uri,
+          state: state,
+          response_type: response_type,
+          scope: scope,
+          client_name: client.name,
+          status: I18n.t("doorkeeper.pre_authorization.status"),
+        }
       end
     end
   end

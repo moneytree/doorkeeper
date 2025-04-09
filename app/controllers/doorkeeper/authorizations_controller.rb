@@ -12,7 +12,6 @@ module Doorkeeper
       end
     end
 
-    # TODO: Handle raise invalid authorization
     def create
       redirect_or_render authorize_response
     end
@@ -66,9 +65,16 @@ module Doorkeeper
     end
 
     def pre_auth
-      @pre_auth ||= OAuth::PreAuthorization.new(Doorkeeper.configuration,
-                                                server.client_via_uid,
-                                                params)
+      @pre_auth ||= OAuth::PreAuthorization.new(Doorkeeper.configuration, pre_auth_params)
+    end
+
+    def pre_auth_params
+      params.slice(*pre_auth_param_fields).permit(*pre_auth_param_fields)
+    end
+
+    def pre_auth_param_fields
+      %i[client_id response_type redirect_uri scope state code_challenge
+         code_challenge_method]
     end
 
     def authorization
@@ -81,10 +87,11 @@ module Doorkeeper
 
     def authorize_response
       @authorize_response ||= begin
-        authorizable = pre_auth.authorizable?
-        before_successful_authorization if authorizable
+        return pre_auth.error_response unless pre_auth.authorizable?
+
+        before_successful_authorization
         auth = strategy.authorize
-        after_successful_authorization if authorizable
+        after_successful_authorization
         auth
       end
     end

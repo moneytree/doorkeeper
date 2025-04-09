@@ -1,4 +1,4 @@
-CHANGELOG_FILE = 'NEWS.md'
+CHANGELOG_FILE = 'CHANGELOG.md'
 GITHUB_REPO = 'https://github.com/doorkeeper-gem/doorkeeper'
 
 def changelog_changed?
@@ -11,7 +11,7 @@ def changelog_entry_example
                    .sub(/[?.!,;]?$/, '')
                    .capitalize
 
-  "- [##{pr_number}]: #{pr_title}."
+  "- [##{pr_number}] #{pr_title}."
 end
 
 # --------------------------------------------------------------------------------------------------------------------

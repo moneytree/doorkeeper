@@ -13,26 +13,27 @@ module Doorkeeper
 
       attr_accessor :access_token, :client, :credentials, :refresh_token,
                     :server
+      attr_reader   :missing_param
 
       def initialize(server, refresh_token, credentials, parameters = {})
-        @server          = server
-        @refresh_token   = refresh_token
-        @credentials     = credentials
+        @server = server
+        @refresh_token = refresh_token
+        @credentials = credentials
         @original_scopes = parameters[:scope] || parameters[:scopes]
         @refresh_token_parameter = parameters[:refresh_token]
-
-        if credentials
-          @client = Doorkeeper.configuration.application_model.by_uid_and_secret credentials.uid,
-                                                  credentials.secret
-        end
+        @client = load_client(credentials) if credentials
       end
 
       private
 
+      def load_client(credentials)
+        Doorkeeper.configuration.application_model.by_uid_and_secret(credentials.uid, credentials.secret)
+      end
+
       def before_successful_response
         refresh_token.transaction do
           refresh_token.lock!
-          raise Errors::InvalidTokenReuse if refresh_token.revoked?
+          raise Errors::InvalidGrantReuse if refresh_token.revoked?
 
           refresh_token.revoke unless refresh_token_revoked_on_use?
           create_access_token
@@ -76,7 +77,9 @@ module Doorkeeper
       end
 
       def validate_token_presence
-        refresh_token.present? || @refresh_token_parameter.present?
+        @missing_param = :refresh_token if refresh_token.blank? && @refresh_token_parameter.blank?
+
+        @missing_param.nil?
       end
 
       def validate_token

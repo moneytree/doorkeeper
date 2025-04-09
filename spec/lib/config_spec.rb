@@ -502,7 +502,21 @@ describe Doorkeeper, "configuration" do
 
   describe "base_controller" do
     context "default" do
-      it { expect(Doorkeeper.configuration.base_controller).to eq("ActionController::Base") }
+      it { expect(Doorkeeper.configuration.base_controller).to be_an_instance_of(Proc) }
+
+      it "resolves to a ApplicationController::Base in default mode" do
+        expect(Doorkeeper.configuration.resolve_controller(:base))
+          .to eq(ActionController::Base)
+      end
+
+      it "resolves to a ApplicationController::API in api_only mode" do
+        Doorkeeper.configure do
+          api_only
+        end
+
+        expect(Doorkeeper.configuration.resolve_controller(:base))
+          .to eq(ActionController::API)
+      end
     end
 
     context "custom" do
@@ -517,23 +531,23 @@ describe Doorkeeper, "configuration" do
     end
   end
 
-  describe 'base_metal_controller' do
-    context 'default' do
-      it { expect(Doorkeeper.configuration.base_metal_controller).to eq('ActionController::Metal') }
+  describe "base_metal_controller" do
+    context "default" do
+      it { expect(Doorkeeper.configuration.base_metal_controller).to eq("ActionController::API") }
     end
 
-    context 'custom' do
+    context "custom" do
       before do
         Doorkeeper.configure do
           orm DOORKEEPER_ORM
-          base_metal_controller 'ApplicationController'
+          base_metal_controller { "ApplicationController" }
         end
       end
 
-      it { expect(Doorkeeper.configuration.base_metal_controller).to eq('ApplicationController') }
+      it { expect(Doorkeeper.configuration.resolve_controller(:base_metal)).to eq(ApplicationController) }
     end
   end
-  
+
   if DOORKEEPER_ORM == :active_record
     describe "active_record_options" do
       let(:models) { [Doorkeeper::AccessGrant, Doorkeeper::AccessToken, Doorkeeper::Application] }
@@ -571,6 +585,21 @@ describe Doorkeeper, "configuration" do
       end
 
       expect(subject.api_only).to eq(true)
+    end
+  end
+
+  describe "token_lookup_batch_size" do
+    it "uses default doorkeeper value" do
+      expect(subject.token_lookup_batch_size).to eq(10_000)
+    end
+
+    it "can change the value" do
+      Doorkeeper.configure do
+        orm DOORKEEPER_ORM
+        token_lookup_batch_size 100_000
+      end
+
+      expect(subject.token_lookup_batch_size).to eq(100_000)
     end
   end
 
@@ -708,6 +737,17 @@ describe Doorkeeper, "configuration" do
       it "will enable hashing for applications" do
         expect(subject.application_secret_strategy).to eq(Doorkeeper::SecretStoring::Sha256Hash)
         expect(subject.application_secret_fallback_strategy).to eq(Doorkeeper::SecretStoring::Plain)
+      end
+    end
+  end
+
+  describe "options deprecation" do
+    it "prints a warning message when an option is deprecated" do
+      expect(Kernel).to receive(:warn).with(
+        "[DOORKEEPER] native_redirect_uri has been deprecated and will soon be removed"
+      )
+      Doorkeeper.configure do
+        native_redirect_uri "urn:ietf:wg:oauth:2.0:oob"
       end
     end
   end

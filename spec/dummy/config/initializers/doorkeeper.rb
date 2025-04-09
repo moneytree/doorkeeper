@@ -65,15 +65,6 @@ Doorkeeper.configure do
   # Check out the wiki for more information on customization
   # access_token_methods :from_bearer_authorization, :from_access_token_param, :from_bearer_param
 
-  # Change the native redirect uri for client apps
-  # When clients register with the following redirect uri, they won't be redirected to any server and
-  # the authorization code will be displayed within the provider
-  # The value can be any string. Use nil to disable this feature.
-  # When disabled, clients must provide a valid URL
-  # (Similar behaviour: https://developers.google.com/accounts/docs/OAuth2InstalledApp#choosingredirecturi)
-  #
-  # native_redirect_uri 'urn:ietf:wg:oauth:2.0:oob'
-
   # Forces the usage of the HTTPS protocol in non-native redirect uris (enabled
   # by default in non-development environments). OAuth2 delegates security in
   # communication to the HTTPS protocol so it is wise to keep this enabled.
@@ -115,6 +106,60 @@ Doorkeeper.configure do
   # skip_authorization do |resource_owner, client|
   #   client.superapp? or resource_owner.admin?
   # end
+
+  # Configure custom constraints for the Token Introspection request.
+  # By default this configuration option allows to introspect a token by another
+  # token of the same application, OR to introspect the token that belongs to
+  # authorized client (from authenticated client) OR when token doesn't
+  # belong to any client (public token). Otherwise requester has no access to the
+  # introspection and it will return response as stated in the RFC.
+  #
+  # Block arguments:
+  #
+  # @param token [Doorkeeper::AccessToken]
+  #   token to be introspected
+  #
+  # @param authorized_client [Doorkeeper::Application]
+  #   authorized client (if request is authorized using Basic auth with
+  #   Client Credentials for example)
+  #
+  # @param authorized_token [Doorkeeper::AccessToken]
+  #   Bearer token used to authorize the request
+  #
+  # In case the block returns `nil` or `false` introspection responses with 401 status code
+  # when using authorized token to introspect, or you'll get 200 with { "active": false } body
+  # when using authorized client to introspect as stated in the
+  # RFC 7662 section 2.2. Introspection Response.
+  #
+  # Using with caution:
+  # Keep in mind that these three parameters pass to block can be nil as following case:
+  #  `authorized_client` is nil if and only if `authorized_token` is present, and vice versa.
+  #  `token` will be nil if and only if `authorized_token` is present.
+  # So remember to use `&` or check if it is present before calling method on
+  # them to make sure you doesn't get NoMethodError exception.
+  #
+  # You can define your custom check:
+  #
+  # allow_token_introspection do |token, authorized_client, authorized_token|
+  #   if authorized_token
+  #     # customize: require `introspection` scope
+  #     authorized_token.application == token&.application ||
+  #       authorized_token.scopes.include?("introspection")
+  #   elsif token.application
+  #     # `protected_resource` is a new database boolean column, for example
+  #     authorized_client == token.application || authorized_client.protected_resource?
+  #   else
+  #     # public token (when token.application is nil, token doesn't belong to any application)
+  #     true
+  #   end
+  # end
+  #
+  # Or you can completely disable any token introspection:
+  #
+  # allow_token_introspection false
+  #
+  # If you need to block the request at all, then configure your routes.rb or web-server
+  # like nginx to forbid the request.
 
   # WWW-Authenticate Realm (default "Doorkeeper").
   realm "Doorkeeper"

@@ -52,6 +52,8 @@ require "doorkeeper/oauth/token"
 require "doorkeeper/oauth/token_introspection"
 require "doorkeeper/oauth/invalid_token_response"
 require "doorkeeper/oauth/forbidden_token_response"
+require "doorkeeper/oauth/invalid_request_response"
+require "doorkeeper/oauth/nonstandard"
 
 require "doorkeeper/secret_storing/base"
 require "doorkeeper/secret_storing/plain"
@@ -80,6 +82,8 @@ require "doorkeeper/stale_records_cleaner"
 
 require "doorkeeper/orm/active_record"
 
+# Main Doorkeeper namespace.
+#
 module Doorkeeper
   def self.authenticate(request, methods = Doorkeeper.configuration.access_token_methods)
     OAuth::Token.authenticate(request, *methods)

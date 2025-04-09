@@ -1,3 +1,4 @@
+require: rubocop-performance
 AllCops:
   TargetRubyVersion: 2.4
   Exclude:
@@ -10,6 +11,7 @@ Metrics/BlockLength:
   Exclude:
     - spec/**/*
     - lib/doorkeeper/rake/*
+    - doorkeeper.gemspec
 
 Metrics/LineLength:
   Exclude:
@@ -18,7 +20,7 @@ Metrics/LineLength:
 
 Metrics/MethodLength:
   Exclude:
-    - spec/dummy/db/*
+    - spec/dummy/db/**/*
 
 Style/StringLiterals:
   EnforcedStyle: double_quotes
@@ -41,6 +43,10 @@ Style/WordArray:
 Style/ClassAndModuleChildren:
   Exclude:
     - spec/**/*
+Style/NumericPredicate:
+  Enabled: false
+Style/DoubleNegation:
+  Enabled: false
 
 Layout/MultilineMethodCallIndentation:
   EnforcedStyle: indented
