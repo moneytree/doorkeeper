@@ -1,4 +1,4 @@
-require 'spec_helper_integration'
+require 'spec_helper'
 
 module Doorkeeper::OAuth
   describe BaseRequest do
@@ -20,7 +20,7 @@ module Doorkeeper::OAuth
     let(:server) do
       double :server,
         access_token_expires_in: 100,
-        custom_access_token_expires_in: ->(_) { nil },
+        custom_access_token_expires_in: ->(_context) { nil },
         refresh_token_enabled?: false
     end
 
@@ -104,6 +104,44 @@ module Doorkeeper::OAuth
         )
 
         expect(result).to be_an_instance_of(Doorkeeper::AccessToken)
+      end
+
+      it "respects custom_access_token_expires_in" do
+        server = double(:server,
+                        access_token_expires_in: 100,
+                        custom_access_token_expires_in: ->(context) { context.scopes == "public" ? 500 : nil },
+                        refresh_token_enabled?: false)
+        result = subject.find_or_create_access_token(
+          client,
+          "1",
+          "public",
+          server
+        )
+        expect(result.expires_in).to eql(500)
+      end
+
+      it "respects use_refresh_token with a block" do
+        server = double(:server,
+                        access_token_expires_in: 100,
+                        custom_access_token_expires_in: ->(_context) { nil },
+                        refresh_token_enabled?: lambda { |context|
+                          context.scopes == "public"
+                        })
+        result = subject.find_or_create_access_token(
+          client,
+          "1",
+          "public",
+          server
+        )
+        expect(result.refresh_token).to_not be_nil
+
+        result = subject.find_or_create_access_token(
+          client,
+          "1",
+          "private",
+          server
+        )
+        expect(result.refresh_token).to be_nil
       end
     end
 

@@ -1,24 +1,25 @@
 module Doorkeeper
   class ApplicationsController < Doorkeeper::ApplicationController
-    layout 'doorkeeper/admin'
+    layout 'doorkeeper/admin' unless Doorkeeper.configuration.api_only
 
     before_action :authenticate_admin!
-    before_action :set_application, only: [:show, :edit, :update, :destroy]
+    before_action :set_application, only: %i[show edit update destroy]
 
     def index
-      @applications = if Doorkeeper.configuration.application_model.respond_to?(:ordered_by)
-        Doorkeeper.configuration.application_model.ordered_by(:created_at)
-                      else
-                        ActiveSupport::Deprecation.warn <<-MSG.squish
-                          Doorkeeper #{Doorkeeper.configuration.orm} extension must implement #ordered_by
-                          method for it's models as it will be used by default in Doorkeeper 5.
-                        MSG
+      @applications = Doorkeeper.configuration.application_model.ordered_by(:created_at)
 
-                        Doorkeeper.configuration.application_model.all
-                      end
+      respond_to do |format|
+        format.html
+        format.json { head :no_content }
+      end
     end
 
-    def show; end
+    def show
+      respond_to do |format|
+        format.html
+        format.json { render json: @application }
+      end
+    end
 
     def new
       @application = Doorkeeper.configuration.application_model.new
@@ -27,27 +28,45 @@ module Doorkeeper
     def create
       @application = Doorkeeper.configuration.application_model.new(application_params)
       if @application.save
-        flash[:notice] = I18n.t(:notice, scope: [:doorkeeper, :flash, :applications, :create])
-        redirect_to oauth_application_url(@application)
+        flash[:notice] = I18n.t(:notice, scope: %i[doorkeeper flash applications create])
+
+        respond_to do |format|
+          format.html { redirect_to oauth_application_url(@application) }
+          format.json { render json: @application }
+        end
       else
-        render :new
+        respond_to do |format|
+          format.html { render :new }
+          format.json { render json: { errors: @application.errors.full_messages }, status: :unprocessable_entity }
+        end
       end
     end
 
     def edit; end
 
     def update
-      if @application.update_attributes(application_params)
-        flash[:notice] = I18n.t(:notice, scope: [:doorkeeper, :flash, :applications, :update])
-        redirect_to oauth_application_url(@application)
+      if @application.update(application_params)
+        flash[:notice] = I18n.t(:notice, scope: %i[doorkeeper flash applications update])
+
+        respond_to do |format|
+          format.html { redirect_to oauth_application_url(@application) }
+          format.json { render json: @application }
+        end
       else
-        render :edit
+        respond_to do |format|
+          format.html { render :edit }
+          format.json { render json: { errors: @application.errors.full_messages }, status: :unprocessable_entity }
+        end
       end
     end
 
     def destroy
-      flash[:notice] = I18n.t(:notice, scope: [:doorkeeper, :flash, :applications, :destroy]) if @application.destroy
-      redirect_to oauth_applications_url
+      flash[:notice] = I18n.t(:notice, scope: %i[doorkeeper flash applications destroy]) if @application.destroy
+
+      respond_to do |format|
+        format.html { redirect_to oauth_applications_url }
+        format.json { head :no_content }
+      end
     end
 
     private

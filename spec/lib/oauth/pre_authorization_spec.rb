@@ -1,13 +1,13 @@
-require 'spec_helper_integration'
+require 'spec_helper'
 
 module Doorkeeper::OAuth
   describe PreAuthorization do
-    let(:server) {
+    let(:server) do
       server = Doorkeeper.configuration
       allow(server).to receive(:default_scopes).and_return(Scopes.new)
       allow(server).to receive(:scopes).and_return(Scopes.from_string('public profile'))
       server
-    }
+    end
 
     let(:application) do
       application = double :application
@@ -133,7 +133,7 @@ module Doorkeeper::OAuth
       end
 
       it 'invalidates redirect_uri when it does\'n match with the client' do
-        subject.redirect_uri = native_redirect_uri
+        subject.redirect_uri = 'urn:ietf:wg:oauth:2.0:oob'
         expect(subject).not_to be_authorizable
       end
     end
@@ -155,6 +155,30 @@ module Doorkeeper::OAuth
     it 'requires a redirect uri' do
       subject.redirect_uri = nil
       expect(subject).not_to be_authorizable
+    end
+
+    describe "as_json" do
+      let(:client_id) { "client_uid_123" }
+      let(:client_name) { "Acme Co." }
+
+      before do
+        allow(client).to receive(:uid).and_return client_id
+        allow(client).to receive(:name).and_return client_name
+      end
+
+      let(:json) { subject.as_json({}) }
+
+      it { is_expected.to respond_to :as_json }
+
+      it "returns correct values" do
+        expect(json[:client_id]).to eq client_id
+        expect(json[:redirect_uri]).to eq subject.redirect_uri
+        expect(json[:state]).to eq subject.state
+        expect(json[:response_type]).to eq subject.response_type
+        expect(json[:scope]).to eq subject.scope
+        expect(json[:client_name]).to eq client_name
+        expect(json[:status]).to eq I18n.t('doorkeeper.pre_authorization.status')
+      end
     end
   end
 end

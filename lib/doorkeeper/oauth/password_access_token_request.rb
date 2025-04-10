@@ -16,6 +16,7 @@ module Doorkeeper
         @client          = client
         @parameters      = parameters
         @original_scopes = parameters[:scope]
+        @grant_type      = Doorkeeper::OAuth::PASSWORD
       end
 
       private
@@ -26,16 +27,18 @@ module Doorkeeper
       end
 
       def validate_scopes
-        return true unless @original_scopes.present?
-        ScopeChecker.valid? @original_scopes, server.scopes, client.try(:scopes)
+        client_scopes = client.try(:scopes)
+        return true if scopes.blank?
+
+        ScopeChecker.valid?(scopes.to_s, server.scopes, client_scopes)
       end
 
       def validate_resource_owner
-        !!resource_owner
+        !resource_owner.nil?
       end
 
       def validate_client
-        !parameters[:client_id] || !!client
+        !parameters[:client_id] || !client.nil?
       end
     end
   end
