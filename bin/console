@@ -3,6 +3,7 @@
 
 require "bundler/setup"
 require "rails/all"
+require "active_support/all"
 require "doorkeeper"
 
 # You can add fixtures and/or initialization code here to make experimenting
@@ -11,6 +12,25 @@ require "doorkeeper"
 # (If you use this, don't forget to add pry to your Gemfile!)
 # require "pry"
 # Pry.start
+
+Rails.logger = Logger.new(STDOUT)
+
+Rails.logger.info("Doorkeeper version: #{Doorkeeper::VERSION::STRING}")
+Rails.logger.info("Rails version: #{Rails::VERSION::STRING}")
+
+# Default Doorkeeper config
+Doorkeeper.configure do
+  orm :active_record
+end
+
+# Generate in-memory database for testing
+ActiveRecord::Base.establish_connection(
+  adapter: "sqlite3",
+  database: ":memory:",
+)
+
+# Load database schema
+load File.expand_path("../spec/dummy/db/schema.rb", __dir__)
 
 require "irb"
 IRB.start(__FILE__)

@@ -8,7 +8,7 @@ module Doorkeeper
   class RedirectUriValidator < ActiveModel::EachValidator
     def validate_each(record, attribute, value)
       if value.blank?
-        return if Doorkeeper.configuration.allow_blank_redirect_uri?(record)
+        return if Doorkeeper.config.allow_blank_redirect_uri?(record)
 
         record.errors.add(attribute, :blank)
       else
@@ -21,6 +21,7 @@ module Doorkeeper
           record.errors.add(attribute, :unspecified_scheme) if unspecified_scheme?(uri)
           record.errors.add(attribute, :relative_uri) if relative_uri?(uri)
           record.errors.add(attribute, :secured_uri) if invalid_ssl_uri?(uri)
+          record.errors.add(attribute, :invalid_uri) if unspecified_host?(uri)
         end
       end
     rescue URI::InvalidURIError
@@ -34,7 +35,7 @@ module Doorkeeper
     end
 
     def forbidden_uri?(uri)
-      Doorkeeper.configuration.forbid_redirect_uri.call(uri)
+      Doorkeeper.config.forbid_redirect_uri.call(uri)
     end
 
     def unspecified_scheme?(uri)
@@ -43,12 +44,16 @@ module Doorkeeper
       %w[localhost].include?(uri.try(:scheme))
     end
 
+    def unspecified_host?(uri)
+      uri.is_a?(URI::HTTP) && uri.host.blank?
+    end
+
     def relative_uri?(uri)
-      uri.scheme.nil? && uri.host.nil?
+      uri.scheme.nil? && uri.host.blank?
     end
 
     def invalid_ssl_uri?(uri)
-      forces_ssl = Doorkeeper.configuration.force_ssl_in_redirect_uri
+      forces_ssl = Doorkeeper.config.force_ssl_in_redirect_uri
       non_https = uri.try(:scheme) == "http"
 
       if forces_ssl.respond_to?(:call)

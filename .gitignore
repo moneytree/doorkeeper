@@ -19,3 +19,4 @@ gemfiles/*.lock
 coverage
 */.DS_Store
 *.gem
+gemfiles/vendor

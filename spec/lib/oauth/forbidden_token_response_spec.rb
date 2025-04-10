@@ -2,21 +2,30 @@
 
 require "spec_helper"
 
-module Doorkeeper::OAuth
-  describe ForbiddenTokenResponse do
-    describe "#name" do
-      it { expect(subject.name).to eq(:invalid_scope) }
+RSpec.describe Doorkeeper::OAuth::ForbiddenTokenResponse do
+  subject(:response) { described_class.new }
+
+  describe "#name" do
+    it { expect(response.name).to eq(:invalid_scope) }
+  end
+
+  describe "#status" do
+    it { expect(response.status).to eq(:forbidden) }
+  end
+
+  describe ".from_scopes" do
+    subject(:response) { described_class.from_scopes(["public"]) }
+
+    it "includes a list of acceptable scopes" do
+      expect(response.description).to include("public")
     end
 
-    describe "#status" do
-      it { expect(subject.status).to eq(:forbidden) }
+    it "explains that the problem is due to a missing scope" do
+      expect(response.description).to match(/requires scope/i)
     end
 
-    describe :from_scopes do
-      it "should have a list of acceptable scopes" do
-        response = ForbiddenTokenResponse.from_scopes(["public"])
-        expect(response.description).to include("public")
-      end
+    it "does not use the scope description from authorize page" do
+      expect(response.description).not_to eql("Access your public data")
     end
   end
 end

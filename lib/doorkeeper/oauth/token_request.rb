@@ -3,16 +3,16 @@
 module Doorkeeper
   module OAuth
     class TokenRequest
-      attr_accessor :pre_auth, :resource_owner
+      attr_reader :pre_auth, :resource_owner
 
       def initialize(pre_auth, resource_owner)
-        @pre_auth       = pre_auth
+        @pre_auth = pre_auth
         @resource_owner = resource_owner
       end
 
       def authorize
         auth = Authorization::Token.new(pre_auth, resource_owner)
-        auth.issue_token
+        auth.issue_token!
         CodeResponse.new(pre_auth, auth, response_on_fragment: true)
       end
 

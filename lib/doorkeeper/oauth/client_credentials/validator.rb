@@ -2,8 +2,8 @@
 
 module Doorkeeper
   module OAuth
-    class ClientCredentialsRequest < BaseRequest
-      class Validation
+    module ClientCredentials
+      class Validator
         include Validations
         include OAuth::Helpers
 
@@ -26,26 +26,27 @@ module Doorkeeper
         end
 
         def validate_client_supports_grant_flow
-          Doorkeeper.configuration.allow_grant_flow_for_client?(
+          return if @client.blank?
+
+          Doorkeeper.config.allow_grant_flow_for_client?(
             Doorkeeper::OAuth::CLIENT_CREDENTIALS,
-            @client
+            @client.application,
           )
         end
 
         def validate_scopes
-          return true if @request.scopes.blank?
-
           application_scopes = if @client.present?
                                  @client.application.scopes
                                else
                                  ""
                                end
+          return true if @request.scopes.blank? && application_scopes.blank?
 
           ScopeChecker.valid?(
             scope_str: @request.scopes.to_s,
             server_scopes: @server.scopes,
             app_scopes: application_scopes,
-            grant_type: Doorkeeper::OAuth::CLIENT_CREDENTIALS
+            grant_type: Doorkeeper::OAuth::CLIENT_CREDENTIALS,
           )
         end
       end

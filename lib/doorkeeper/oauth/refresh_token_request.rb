@@ -11,9 +11,8 @@ module Doorkeeper
       validate :client_match, error: :invalid_grant
       validate :scope,        error: :invalid_scope
 
-      attr_accessor :access_token, :client, :credentials, :refresh_token,
-                    :server
-      attr_reader   :missing_param
+      attr_reader :access_token, :client, :credentials, :refresh_token
+      attr_reader :missing_param
 
       def initialize(server, refresh_token, credentials, parameters = {})
         @server = server
@@ -27,7 +26,7 @@ module Doorkeeper
       private
 
       def load_client(credentials)
-        Doorkeeper.configuration.application_model.by_uid_and_secret(credentials.uid, credentials.secret)
+        Doorkeeper.config.application_model.by_uid_and_secret(credentials.uid, credentials.secret)
       end
 
       def before_successful_response
@@ -42,7 +41,7 @@ module Doorkeeper
       end
 
       def refresh_token_revoked_on_use?
-        Doorkeeper.configuration.access_token_model.refresh_token_revoked_on_use?
+        Doorkeeper.config.access_token_model.refresh_token_revoked_on_use?
       end
 
       def default_scopes
@@ -50,30 +49,40 @@ module Doorkeeper
       end
 
       def create_access_token
-        @access_token = Doorkeeper.configuration.access_token_model.create!(access_token_attributes)
-      end
+        attributes = {}.merge(custom_token_attributes_with_data)
 
-      def access_token_attributes
-        {
-          application_id: refresh_token.application_id,
-          resource_owner_id: refresh_token.resource_owner_id,
-          scopes: scopes.to_s,
-          expires_in: access_token_expires_in,
-          use_refresh_token: true,
-        }.tap do |attributes|
-          if refresh_token_revoked_on_use?
-            attributes[:previous_refresh_token] = refresh_token.refresh_token
+        resource_owner =
+          if Doorkeeper.config.polymorphic_resource_owner?
+            refresh_token.resource_owner
+          else
+            refresh_token.resource_owner_id
           end
-        end
-      end
 
-      def access_token_expires_in
-        context = Authorization::Token.build_context(
-          client,
-          Doorkeeper::OAuth::REFRESH_TOKEN,
-          scopes
+        if refresh_token_revoked_on_use?
+          attributes[:previous_refresh_token] = refresh_token.refresh_token
+        end
+
+        # RFC6749
+        # 1.5.  Refresh Token
+        #
+        # Refresh tokens are issued to the client by the authorization server and are
+        # used to obtain a new access token when the current access token
+        # becomes invalid or expires, or to obtain additional access tokens
+        # with identical or narrower scope (access tokens may have a shorter
+        # lifetime and fewer permissions than authorized by the resource
+        # owner).
+        #
+        # Here we assume that TTL of the token received after refreshing should be
+        # the same as that of the original token.
+        #
+        @access_token = Doorkeeper.config.access_token_model.create_for(
+          application: refresh_token.application,
+          resource_owner: resource_owner,
+          scopes: scopes,
+          expires_in: refresh_token.expires_in,
+          use_refresh_token: true,
+          **attributes,
         )
-        Authorization::Token.access_token_expires_in(server, context)
       end
 
       def validate_token_presence
@@ -92,7 +101,7 @@ module Doorkeeper
         client.present?
       end
 
-      # @see https://tools.ietf.org/html/draft-ietf-oauth-v2-22#section-1.5
+      # @see https://datatracker.ietf.org/doc/html/rfc6749#section-1.5
       #
       def validate_client_match
         return true if refresh_token.application_id.blank?
@@ -104,11 +113,19 @@ module Doorkeeper
         if @original_scopes.present?
           ScopeChecker.valid?(
             scope_str: @original_scopes,
-            server_scopes: refresh_token.scopes
+            server_scopes: refresh_token.scopes,
           )
         else
           true
         end
+      end
+
+      def custom_token_attributes_with_data
+        refresh_token
+        .attributes
+        .with_indifferent_access
+        .slice(*Doorkeeper.config.custom_access_token_attributes)
+        .symbolize_keys
       end
     end
   end

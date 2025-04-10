@@ -49,11 +49,13 @@ feature "Authorization Code Flow" do
 
       access_token_should_exist_for(@client, @resource_owner)
 
-      should_not_have_json "error"
-
-      should_have_json "access_token", Doorkeeper::AccessToken.first.token
-      should_have_json "token_type", "Bearer"
-      should_have_json_within "expires_in", Doorkeeper::AccessToken.first.expires_in, 1
+      expect(json_response).to match(
+        "access_token" => Doorkeeper::AccessToken.first.token,
+        "token_type" => "Bearer",
+        "expires_in" => 7200,
+        "scope" => "default",
+        "created_at" => an_instance_of(Integer),
+      )
     end
   end
 
@@ -124,8 +126,10 @@ feature "Authorization Code Flow" do
 
     expect(Doorkeeper::AccessToken.count).to be_zero
 
-    should_have_json "error", "invalid_request"
-    should_have_json "error_description", translated_invalid_request_error_message(:missing_param, :code)
+    expect(json_response).to match(
+      "error" => "invalid_request",
+      "error_description" => translated_invalid_request_error_message(:missing_param, :code),
+    )
   end
 
   scenario "resource owner requests an access token with authorization code" do
@@ -137,11 +141,13 @@ feature "Authorization Code Flow" do
 
     access_token_should_exist_for(@client, @resource_owner)
 
-    should_not_have_json "error"
-
-    should_have_json "access_token", Doorkeeper::AccessToken.first.token
-    should_have_json "token_type", "Bearer"
-    should_have_json_within "expires_in", Doorkeeper::AccessToken.first.expires_in, 1
+    expect(json_response).to match(
+      "access_token" => Doorkeeper::AccessToken.first.token,
+      "token_type" => "Bearer",
+      "expires_in" => 7200,
+      "scope" => "default",
+      "created_at" => an_instance_of(Integer),
+    )
   end
 
   scenario "resource owner requests an access token with authorization code but without secret" do
@@ -149,13 +155,18 @@ feature "Authorization Code Flow" do
     click_on "Authorize"
 
     authorization_code = Doorkeeper::AccessGrant.first.token
-    page.driver.post token_endpoint_url(code: authorization_code, client_id: @client.uid,
-                                        redirect_uri: @client.redirect_uri)
+    page.driver.post token_endpoint_url(
+      code: authorization_code,
+      client_id: @client.uid,
+      redirect_uri: @client.redirect_uri,
+    )
 
     expect(Doorkeeper::AccessToken.count).to be_zero
 
-    should_have_json "error", "invalid_client"
-    should_have_json "error_description", translated_error_message(:invalid_client)
+    expect(json_response).to match(
+      "error" => "invalid_client",
+      "error_description" => translated_error_message(:invalid_client),
+    )
   end
 
   scenario "resource owner requests an access token with authorization code but without client id" do
@@ -163,21 +174,27 @@ feature "Authorization Code Flow" do
     click_on "Authorize"
 
     authorization_code = Doorkeeper::AccessGrant.first.token
-    page.driver.post token_endpoint_url(code: authorization_code, client_secret: @client.secret,
-                                        redirect_uri: @client.redirect_uri)
+    page.driver.post token_endpoint_url(
+      code: authorization_code,
+      client_secret: @client.secret,
+      redirect_uri: @client.redirect_uri,
+    )
 
     expect(Doorkeeper::AccessToken.count).to be_zero
 
-    should_have_json "error", "invalid_client"
-    should_have_json "error_description", translated_error_message(:invalid_client)
+    expect(json_response).to match(
+      "error" => "invalid_client",
+      "error_description" => translated_error_message(:invalid_client),
+    )
   end
 
-  scenario "silently authorizes if matching token exists" do
+  scenario "silently authorizes if active matching token exists" do
     default_scopes_exist :public, :write
 
     access_token_exists application: @client,
-                        expires_in: -100, # even expired token
+                        expires_in: 10_000,
                         resource_owner_id: @resource_owner.id,
+                        resource_owner_type: @resource_owner.class.name,
                         scopes: "public write"
 
     visit authorization_endpoint_url(client: @client, scope: "public write")
@@ -187,7 +204,7 @@ feature "Authorization Code Flow" do
   end
 
   context "with PKCE" do
-    context "plain" do
+    context "when plain" do
       let(:code_challenge) { "a45a9fea-0676-477e-95b1-a40f72ac3cfb" }
       let(:code_verifier) { "a45a9fea-0676-477e-95b1-a40f72ac3cfb" }
 
@@ -195,7 +212,7 @@ feature "Authorization Code Flow" do
         visit authorization_endpoint_url(
           client: @client,
           code_challenge: code_challenge,
-          code_challenge_method: "plain"
+          code_challenge_method: "plain",
         )
         click_on "Authorize"
 
@@ -208,18 +225,14 @@ feature "Authorization Code Flow" do
         visit authorization_endpoint_url(client: @client)
         click_on "Authorize"
 
-        authorization_code = current_params["code"]
-        create_access_token authorization_code, @client, code_verifier
-
-        should_have_json "error", "invalid_grant"
-        should_have_json "error_description", translated_error_message(:invalid_grant)
+        url_should_have_param("code", Doorkeeper::AccessGrant.first.token)
       end
 
       scenario "mobile app requests an access token with authorization code and plain code challenge method" do
         visit authorization_endpoint_url(
           client: @client,
           code_challenge: code_challenge,
-          code_challenge_method: "plain"
+          code_challenge_method: "plain",
         )
         click_on "Authorize"
 
@@ -228,43 +241,52 @@ feature "Authorization Code Flow" do
 
         access_token_should_exist_for(@client, @resource_owner)
 
-        should_not_have_json "error"
-
-        should_have_json "access_token", Doorkeeper::AccessToken.first.token
-        should_have_json "token_type", "Bearer"
-        should_have_json_within "expires_in", Doorkeeper::AccessToken.first.expires_in, 1
+        expect(json_response).to match(
+          "access_token" => Doorkeeper::AccessToken.first.token,
+          "token_type" => "Bearer",
+          "expires_in" => 7200,
+          "scope" => "default",
+          "created_at" => an_instance_of(Integer),
+        )
       end
 
       scenario "mobile app requests an access token with authorization code but without code_verifier" do
-        visit authorization_endpoint_url(client: @client,
-                                         code_challenge: code_challenge,
-                                         code_challenge_method: "plain")
+        visit authorization_endpoint_url(
+          client: @client,
+          code_challenge: code_challenge,
+          code_challenge_method: "plain",
+        )
         click_on "Authorize"
 
         authorization_code = current_params["code"]
         create_access_token authorization_code, @client, nil
 
-        should_not_have_json "access_token"
-        should_have_json "error", "invalid_request"
-        should_have_json "error_description", translated_invalid_request_error_message(:missing_param, :code_verifier)
+        expect(json_response).to match(
+          "error" => "invalid_request",
+          "error_description" => translated_invalid_request_error_message(:missing_param, :code_verifier),
+        )
       end
 
       scenario "mobile app requests an access token with authorization code with wrong code_verifier" do
-        visit authorization_endpoint_url(client: @client,
-                                         code_challenge: code_challenge,
-                                         code_challenge_method: "plain")
+        visit authorization_endpoint_url(
+          client: @client,
+          code_challenge: code_challenge,
+          code_challenge_method: "plain",
+        )
         click_on "Authorize"
 
         authorization_code = current_params["code"]
         create_access_token authorization_code, @client, "wrong_code_verifier"
 
-        should_not_have_json "access_token"
-        should_have_json "error", "invalid_grant"
-        should_have_json "error_description", translated_error_message(:invalid_grant)
+        expect(json_response).not_to include("access_token")
+        expect(json_response).to match(
+          "error" => "invalid_grant",
+          "error_description" => translated_error_message(:invalid_grant),
+        )
       end
     end
 
-    context "s256" do
+    context "when S256" do
       let(:code_challenge) { "Oz733NtQ0rJP8b04fgZMJMwprn6Iw8sMCT_9bR1q4tA" }
       let(:code_verifier) { "a45a9fea-0676-477e-95b1-a40f72ac3cfb" }
 
@@ -272,7 +294,7 @@ feature "Authorization Code Flow" do
         visit authorization_endpoint_url(
           client: @client,
           code_challenge: code_challenge,
-          code_challenge_method: "S256"
+          code_challenge_method: "S256",
         )
         click_on "Authorize"
 
@@ -285,7 +307,7 @@ feature "Authorization Code Flow" do
         visit authorization_endpoint_url(
           client: @client,
           code_challenge: code_challenge,
-          code_challenge_method: "S256"
+          code_challenge_method: "S256",
         )
         click_on "Authorize"
 
@@ -294,27 +316,35 @@ feature "Authorization Code Flow" do
 
         access_token_should_exist_for(@client, @resource_owner)
 
-        should_not_have_json "error"
-
-        should_have_json "access_token", Doorkeeper::AccessToken.first.token
-        should_have_json "token_type", "Bearer"
-        should_have_json_within "expires_in", Doorkeeper::AccessToken.first.expires_in, 1
+        expect(json_response).to match(
+          "access_token" => Doorkeeper::AccessToken.first.token,
+          "token_type" => "Bearer",
+          "expires_in" => 7200,
+          "scope" => "default",
+          "created_at" => an_instance_of(Integer),
+        )
       end
 
       scenario "mobile app requests an access token with authorization code and without secret" do
         visit authorization_endpoint_url(
           client: @client,
           code_challenge: code_challenge,
-          code_challenge_method: "S256"
+          code_challenge_method: "S256",
         )
         click_on "Authorize"
 
         authorization_code = current_params["code"]
-        page.driver.post token_endpoint_url(code: authorization_code, client_id: @client.uid,
-                                            redirect_uri: @client.redirect_uri, code_verifier: code_verifier)
-        should_not_have_json "access_token"
-        should_have_json "error", "invalid_client"
-        should_have_json "error_description", translated_error_message(:invalid_client)
+        page.driver.post token_endpoint_url(
+          code: authorization_code,
+          client_id: @client.uid,
+          redirect_uri: @client.redirect_uri,
+          code_verifier: code_verifier,
+        )
+
+        expect(json_response).to match(
+          "error" => "invalid_client",
+          "error_description" => translated_error_message(:invalid_client),
+        )
       end
 
       scenario "mobile app requests an access token with authorization code and without secret but is marked as not confidential" do
@@ -327,52 +357,58 @@ feature "Authorization Code Flow" do
           code: authorization_code,
           client_id: @client.uid,
           redirect_uri: @client.redirect_uri,
-          code_verifier: code_verifier
+          code_verifier: code_verifier,
         )
-        should_not_have_json "error"
 
-        should_have_json "access_token", Doorkeeper::AccessToken.first.token
-        should_have_json "token_type", "Bearer"
-        should_have_json_within "expires_in", Doorkeeper::AccessToken.first.expires_in, 1
+        expect(json_response).to match(
+          "access_token" => Doorkeeper::AccessToken.first.token,
+          "token_type" => "Bearer",
+          "expires_in" => 7200,
+          "scope" => "default",
+          "created_at" => an_instance_of(Integer),
+        )
       end
 
       scenario "mobile app requests an access token with authorization code but no code verifier" do
         visit authorization_endpoint_url(
           client: @client,
           code_challenge: code_challenge,
-          code_challenge_method: "S256"
+          code_challenge_method: "S256",
         )
         click_on "Authorize"
 
         authorization_code = current_params["code"]
         create_access_token authorization_code, @client
 
-        should_not_have_json "access_token"
-        should_have_json "error", "invalid_request"
-        should_have_json "error_description", translated_invalid_request_error_message(:missing_param, :code_verifier)
+        expect(json_response).not_to include("access_token")
+        expect(json_response).to match(
+          "error" => "invalid_request",
+          "error_description" => translated_invalid_request_error_message(:missing_param, :code_verifier),
+        )
       end
 
       scenario "mobile app requests an access token with authorization code with wrong verifier" do
         visit authorization_endpoint_url(
           client: @client,
           code_challenge: code_challenge,
-          code_challenge_method: "S256"
+          code_challenge_method: "S256",
         )
         click_on "Authorize"
 
         authorization_code = current_params["code"]
         create_access_token authorization_code, @client, "incorrect-code-verifier"
 
-        should_not_have_json "access_token"
-        should_have_json "error", "invalid_grant"
-        should_have_json "error_description", translated_error_message(:invalid_grant)
+        expect(json_response).to match(
+          "error" => "invalid_grant",
+          "error_description" => translated_error_message(:invalid_grant),
+        )
       end
 
-      scenario "code_challenge_mehthod in token request is totally ignored" do
+      scenario "code_challenge_methhod in token request is totally ignored" do
         visit authorization_endpoint_url(
           client: @client,
           code_challenge: code_challenge,
-          code_challenge_method: "S256"
+          code_challenge_method: "S256",
         )
         click_on "Authorize"
 
@@ -381,12 +417,13 @@ feature "Authorization Code Flow" do
           code: authorization_code,
           client: @client,
           code_verifier: code_challenge,
-          code_challenge_method: "plain"
+          code_challenge_method: "plain",
         )
 
-        should_not_have_json "access_token"
-        should_have_json "error", "invalid_grant"
-        should_have_json "error_description", translated_error_message(:invalid_grant)
+        expect(json_response).to match(
+          "error" => "invalid_grant",
+          "error_description" => translated_error_message(:invalid_grant),
+        )
       end
 
       scenario "expects to set code_challenge_method explicitely without fallback" do
@@ -404,7 +441,7 @@ feature "Authorization Code Flow" do
     scenario "scope is invalid because default scope is different from application scope" do
       default_scopes_exist :admin
       visit authorization_endpoint_url(client: @client)
-      response_status_should_be 200
+      response_status_should_be 400
       i_should_not_see "Authorize"
       i_should_see_translated_error_message :invalid_scope
     end
@@ -464,7 +501,7 @@ feature "Authorization Code Flow" do
 
       expect(Doorkeeper::AccessToken.count).to be(2)
 
-      should_have_json "access_token", Doorkeeper::AccessToken.last.token
+      expect(json_response).to include("access_token" => Doorkeeper::AccessToken.last.token)
     end
 
     scenario "resource owner authorizes the client with extra scopes" do
@@ -477,37 +514,69 @@ feature "Authorization Code Flow" do
 
       expect(Doorkeeper::AccessToken.count).to be(2)
 
-      should_have_json "access_token", Doorkeeper::AccessToken.last.token
+      expect(json_response).to include("access_token" => Doorkeeper::AccessToken.last.token)
       access_token_should_have_scopes :public, :write
     end
   end
-end
 
-describe "Authorization Code Flow" do
-  before do
-    Doorkeeper.configure do
-      orm DOORKEEPER_ORM
-      use_refresh_token
+  context "when two requests sent" do
+    before do
+      Doorkeeper.configure do
+        orm DOORKEEPER_ORM
+        use_refresh_token
+      end
+
+      client_exists
     end
 
-    client_exists
+    describe "issuing a refresh token" do
+      let(:resource_owner) { FactoryBot.create(:resource_owner) }
+
+      before do
+        authorization_code_exists application: @client,
+                                  resource_owner_id: resource_owner.id,
+                                  resource_owner_type: resource_owner.class.name
+      end
+
+      it "second of simultaneous client requests get an error for revoked access token" do
+        authorization_code = Doorkeeper::AccessGrant.first.token
+        allow_any_instance_of(Doorkeeper::AccessGrant)
+          .to receive(:revoked?).and_return(false, true)
+
+        page.driver.post token_endpoint_url(code: authorization_code, client: @client)
+
+        expect(json_response).to match(
+          "error" => "invalid_grant",
+          "error_description" => translated_error_message(:invalid_grant),
+        )
+      end
+    end
   end
 
-  context "issuing a refresh token" do
-    before do
-      authorization_code_exists application: @client
+  context "when custom_access_token_attributes are configured" do
+    let(:resource_owner) { FactoryBot.create(:resource_owner) }
+    let(:client) { client_exists }
+    let(:grant) do
+      authorization_code_exists(
+         application: client,
+         resource_owner_id: resource_owner.id,
+         resource_owner_type: resource_owner.class.name,
+         tenant_name: "Tenant 1",
+       )
     end
 
-    it "second of simultaneous client requests get an error for revoked acccess token" do
-      authorization_code = Doorkeeper::AccessGrant.first.token
-      allow_any_instance_of(Doorkeeper::AccessGrant)
-        .to receive(:revoked?).and_return(false, true)
+    before do
+      Doorkeeper.configure do
+        orm DOORKEEPER_ORM
+        custom_access_token_attributes [:tenant_name]
+      end
+    end
 
-      post token_endpoint_url(code: authorization_code, client: @client)
+    it "copies custom attributes from the grant into the token" do
+      page.driver.post token_endpoint_url(code: grant.token, client: client)
 
-      should_not_have_json "access_token"
-      should_have_json "error", "invalid_grant"
-      should_have_json "error_description", translated_error_message(:invalid_grant)
+      access_token = Doorkeeper::AccessToken.find_by(token: json_response["access_token"])
+      expect(access_token.tenant_name).to eq("Tenant 1")
     end
   end
 end

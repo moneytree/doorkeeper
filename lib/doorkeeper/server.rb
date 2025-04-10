@@ -2,19 +2,19 @@
 
 module Doorkeeper
   class Server
-    attr_accessor :context
+    attr_reader :context
 
-    def initialize(context = nil)
+    def initialize(context)
       @context = context
     end
 
     def authorization_request(strategy)
-      klass = Request.authorization_strategy strategy
+      klass = Request.authorization_strategy(strategy)
       klass.new(self)
     end
 
     def token_request(strategy)
-      klass = Request.token_strategy strategy
+      klass = Request.token_strategy(strategy)
       klass.new(self)
     end
 
@@ -37,7 +37,7 @@ module Doorkeeper
     end
 
     def credentials
-      methods = Doorkeeper.configuration.client_credentials_methods
+      methods = Doorkeeper.config.client_credentials_methods
       @credentials ||= OAuth::Client::Credentials.from_request(context.request, *methods)
     end
   end

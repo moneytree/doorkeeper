@@ -20,8 +20,8 @@ module Doorkeeper
       # @param uid [#to_s] UID (any object that responds to `#to_s`)
       # @param secret [#to_s] secret (any object that responds to `#to_s`)
       #
-      # @return [Doorkeeper::Application, nil] Application instance or nil
-      #   if there is no record with such credentials
+      # @return [Doorkeeper::Application, nil]
+      #   Application instance or nil if there is no record with such credentials
       #
       def by_uid_and_secret(uid, secret)
         app = by_uid(uid)
@@ -47,22 +47,23 @@ module Doorkeeper
       # Determines the secret storing transformer
       # Unless configured otherwise, uses the plain secret strategy
       def secret_strategy
-        ::Doorkeeper.configuration.application_secret_strategy
+        ::Doorkeeper.config.application_secret_strategy
       end
 
       ##
       # Determine the fallback storing strategy
       # Unless configured, there will be no fallback
       def fallback_secret_strategy
-        ::Doorkeeper.configuration.application_secret_fallback_strategy
+        ::Doorkeeper.config.application_secret_fallback_strategy
       end
     end
 
     # Set an application's valid redirect URIs.
     #
-    # @param uris [String, Array] Newline-separated string or array the URI(s)
+    # @param uris [String, Array<String>] Newline-separated string or array the URI(s)
     #
-    # @return [String] The redirect URI(s) seperated by newlines.
+    # @return [String] The redirect URI(s) separated by newlines.
+    #
     def redirect_uri=(uris)
       super(uris.is_a?(Array) ? uris.join("\n") : uris)
     end
@@ -72,7 +73,7 @@ module Doorkeeper
     # @param input [#to_s] Plain secret provided by user
     #        (any object that responds to `#to_s`)
     #
-    # @return [true] Whether the given secret matches the stored secret
+    # @return [Boolean] Whether the given secret matches the stored secret
     #                of this application.
     #
     def secret_matches?(input)

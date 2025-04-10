@@ -3,24 +3,6 @@
 require "ipaddr"
 
 module Doorkeeper
-  module IPAddrLoopback
-    def loopback?
-      case @family
-      when Socket::AF_INET
-        @addr & 0xff000000 == 0x7f000000
-      when Socket::AF_INET6
-        @addr == 1
-      else
-        raise AddressFamilyError, "unsupported address family"
-      end
-    end
-  end
-
-  # For backward compatibility with old rubies
-  if Gem::Version.new(RUBY_VERSION) < Gem::Version.new("2.5.0")
-    IPAddr.send(:include, Doorkeeper::IPAddrLoopback)
-  end
-
   module OAuth
     module Helpers
       module URIChecker
@@ -46,7 +28,7 @@ module Doorkeeper
           end
 
           # RFC8252, Paragraph 7.3
-          # @see https://tools.ietf.org/html/rfc8252#section-7.3
+          # @see https://datatracker.ietf.org/doc/html/rfc8252#section-7.3
           if loopback_uri?(url) && loopback_uri?(client_url)
             url.port = nil
             client_url.port = nil
@@ -58,7 +40,7 @@ module Doorkeeper
 
         def self.loopback_uri?(uri)
           IPAddr.new(uri.host).loopback?
-        rescue IPAddr::Error
+        rescue IPAddr::Error, IPAddr::InvalidAddressError
           false
         end
 
@@ -79,9 +61,9 @@ module Doorkeeper
         end
 
         def self.valid_scheme?(uri)
-          return false if uri.scheme.nil?
+          return false if uri.scheme.blank?
 
-          %w[localhost].include?(uri.scheme) == false
+          %w[localhost].exclude?(uri.scheme)
         end
 
         def self.hypertext_scheme?(uri)
@@ -89,7 +71,7 @@ module Doorkeeper
         end
 
         def self.iff_host?(uri)
-          !(hypertext_scheme?(uri) && uri.host.nil?)
+          !(hypertext_scheme?(uri) && uri.host.blank?)
         end
 
         def self.oob_uri?(uri)

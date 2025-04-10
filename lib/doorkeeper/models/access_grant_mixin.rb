@@ -11,14 +11,11 @@ module Doorkeeper
     include Models::Orderable
     include Models::SecretStorable
     include Models::Scopes
+    include Models::ResourceOwnerable
 
-    # never uses pkce, if pkce migrations were not generated
+    # Never uses PKCE if PKCE migrations were not generated
     def uses_pkce?
-      pkce_supported? && code_challenge.present?
-    end
-
-    def pkce_supported?
-      respond_to? :code_challenge
+      self.class.pkce_supported? && code_challenge.present?
     end
 
     module ClassMethods
@@ -27,8 +24,8 @@ module Doorkeeper
       #
       # @param token [#to_s] token value (any object that responds to `#to_s`)
       #
-      # @return [Doorkeeper::AccessGrant, nil] AccessGrant object or nil
-      #   if there is no record with such token
+      # @return [Doorkeeper::AccessGrant, nil]
+      #   AccessGrant object or nil if there is no record with such token
       #
       def by_token(token)
         find_by_plaintext_token(:token, token)
@@ -39,18 +36,20 @@ module Doorkeeper
       #
       # @param application_id [Integer]
       #   ID of the Application
-      # @param resource_owner [ActiveRecord::Base]
-      #   instance of the Resource Owner model
+      # @param resource_owner [ActiveRecord::Base, Integer]
+      #   instance of the Resource Owner model or it's ID
       #
       def revoke_all_for(application_id, resource_owner, clock = Time)
-        where(application_id: application_id,
-              resource_owner_id: resource_owner.id,
-              revoked_at: nil)
+        by_resource_owner(resource_owner)
+          .where(
+            application_id: application_id,
+            revoked_at: nil,
+          )
           .update_all(revoked_at: clock.now.utc)
       end
 
       # Implements PKCE code_challenge encoding without base64 padding as described in the spec.
-      # https://tools.ietf.org/html/rfc7636#appendix-A
+      # https://datatracker.ietf.org/doc/html/rfc7636#appendix-A
       #   Appendix A.  Notes on Implementing Base64url Encoding without Padding
       #
       #   This appendix describes how to implement a base64url-encoding
@@ -90,26 +89,31 @@ module Doorkeeper
       # suitable for PKCE validation
       #
       def generate_code_challenge(code_verifier)
-        padded_result = Base64.urlsafe_encode64(Digest::SHA256.digest(code_verifier))
-        padded_result.split("=")[0] # Remove any trailing '='
+        Base64.urlsafe_encode64(Digest::SHA256.digest(code_verifier), padding: false)
       end
 
       def pkce_supported?
-        new.pkce_supported?
+        column_names.include?("code_challenge")
       end
 
       ##
       # Determines the secret storing transformer
       # Unless configured otherwise, uses the plain secret strategy
+      #
+      # @return [Doorkeeper::SecretStoring::Base]
+      #
       def secret_strategy
-        ::Doorkeeper.configuration.token_secret_strategy
+        ::Doorkeeper.config.token_secret_strategy
       end
 
       ##
       # Determine the fallback storing strategy
       # Unless configured, there will be no fallback
+      #
+      # @return [Doorkeeper::SecretStoring::Base]
+      #
       def fallback_secret_strategy
-        ::Doorkeeper.configuration.token_secret_fallback_strategy
+        ::Doorkeeper.config.token_secret_fallback_strategy
       end
     end
   end

@@ -2,7 +2,7 @@
 
 require "spec_helper"
 
-describe "SecretStorable" do
+RSpec.describe Doorkeeper::Models::SecretStorable do
   let(:clazz) do
     Class.new do
       include Doorkeeper::Models::SecretStorable
@@ -22,8 +22,8 @@ describe "SecretStorable" do
   end
   let(:strategy) { clazz.secret_strategy }
 
-  describe :find_by_plaintext_token do
-    subject { clazz.send(:find_by_plaintext_token, "attr", "input") }
+  describe ".find_by_plaintext_token" do
+    subject(:result) { clazz.send(:find_by_plaintext_token, "attr", "input") }
 
     it "forwards to the secret_strategy" do
       expect(strategy)
@@ -36,7 +36,7 @@ describe "SecretStorable" do
         .with("attr" => "found")
         .and_return "result"
 
-      expect(subject).to eq "result"
+      expect(result).to eq "result"
     end
 
     it "calls find_by_fallback_token if not found" do
@@ -50,25 +50,26 @@ describe "SecretStorable" do
         .with("attr", "input")
         .and_return "fallback"
 
-      expect(subject).to eq "fallback"
+      expect(result).to eq "fallback"
     end
   end
 
-  describe :find_by_fallback_token do
-    subject { clazz.send(:find_by_fallback_token, "attr", "input") }
+  describe ".find_by_fallback_token" do
+    subject(:result) { clazz.send(:find_by_fallback_token, "attr", "input") }
+
     let(:fallback) { double(::Doorkeeper::SecretStoring::Plain) }
 
     it "returns nil if none defined" do
       expect(clazz.fallback_secret_strategy).to eq nil
-      expect(subject).to eq nil
+      expect(result).to eq nil
     end
 
-    context "if a fallback strategy is defined" do
+    context "when a fallback strategy is defined" do
       before do
         allow(clazz).to receive(:fallback_secret_strategy).and_return(fallback)
       end
 
-      context "if a resource is defined" do
+      context "when resource is defined" do
         let(:resource) { double("Token model") }
 
         it "calls the strategy for lookup" do
@@ -87,18 +88,18 @@ describe "SecretStorable" do
             .to receive(:attr=)
             .with("new value")
 
-          # It will upgrade the secret automtically using the current strategy
+          # It will upgrade the secret automatically using the current strategy
           expect(strategy)
             .to receive(:transform_secret)
             .with("input")
             .and_return("new value")
 
           expect(resource).to receive(:update).with("attr" => "new value")
-          expect(subject).to eq resource
+          expect(result).to eq resource
         end
       end
 
-      context "if a resource is not defined" do
+      context "when resource is not defined" do
         before do
           allow(clazz).to receive(:fallback_secret_strategy).and_return(fallback)
         end
@@ -115,19 +116,19 @@ describe "SecretStorable" do
             .and_return("fallback")
 
           # It does not find a token even with the fallback method
-          expect(subject).to be_nil
+          expect(result).to be_nil
         end
       end
     end
   end
 
-  describe :secret_strategy do
+  describe ".secret_strategy" do
     it "defaults to plain strategy" do
       expect(strategy).to eq Doorkeeper::SecretStoring::Plain
     end
   end
 
-  describe :fallback_secret_strategy do
+  describe ".fallback_secret_strategy" do
     it "defaults to nil" do
       expect(clazz.fallback_secret_strategy).to eq nil
     end

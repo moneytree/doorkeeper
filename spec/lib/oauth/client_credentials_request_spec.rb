@@ -2,108 +2,119 @@
 
 require "spec_helper"
 
-module Doorkeeper::OAuth
-  describe ClientCredentialsRequest do
-    let(:server) do
-      double(
-        default_scopes: nil,
-        access_token_expires_in: 2.hours,
-        custom_access_token_expires_in: ->(_context) { nil }
-      )
+RSpec.describe Doorkeeper::OAuth::ClientCredentialsRequest do
+  subject(:request) { described_class.new(server, client) }
+
+  let(:server) do
+    double(
+      default_scopes: nil,
+      access_token_expires_in: 2.hours,
+      custom_access_token_expires_in: ->(_context) { nil },
+    )
+  end
+
+  let(:application)   { FactoryBot.create(:application, scopes: "") }
+  let(:client)        { double :client, application: application, scopes: "" }
+  let(:token_creator) { double :issuer, create: true, token: double }
+
+  before do
+    allow(server).to receive(:option_defined?).with(:custom_access_token_expires_in).and_return(true)
+    allow(request).to receive(:issuer).and_return(token_creator)
+  end
+
+  it "issues an access token for the current client" do
+    expect(token_creator).to receive(:create).with(client, nil, {})
+    request.authorize
+  end
+
+  it "has successful response when issue was created" do
+    request.authorize
+    expect(request.response).to be_a(Doorkeeper::OAuth::TokenResponse)
+  end
+
+  context "when issue was not created" do
+    before do
+      issuer = double create: false, error: :invalid
+      allow(request).to receive(:issuer).and_return(issuer)
     end
 
-    let(:application)   { FactoryBot.create(:application, scopes: "") }
-    let(:client)        { double :client, application: application }
-    let(:token_creator) { double :issuer, create: true, token: double }
+    it "has an error response" do
+      request.authorize
+      expect(request.response).to be_a(Doorkeeper::OAuth::ErrorResponse)
+    end
+
+    it "delegates the error to issuer" do
+      request.authorize
+      expect(request.error).to eq(:invalid)
+    end
+  end
+
+  context "with scopes" do
+    let(:default_scopes) { Doorkeeper::OAuth::Scopes.from_string("public email") }
 
     before do
-      allow(server).to receive(:option_defined?).with(:custom_access_token_expires_in).and_return(true)
+      allow(server).to receive(:default_scopes).and_return(default_scopes)
     end
 
-    subject { ClientCredentialsRequest.new(server, client) }
+    it "issues an access token with default scopes if none was requested" do
+      expect(token_creator).to receive(:create).with(client, default_scopes, {})
+      request.authorize
+    end
+
+    it "issues an access token with requested scopes" do
+      request = described_class.new(server, client, scope: "email")
+      allow(request).to receive(:issuer).and_return(token_creator)
+      expect(token_creator).to receive(:create).with(client, Doorkeeper::OAuth::Scopes.from_string("email"), {})
+      request.authorize
+    end
+  end
+
+  context "with custom_access_token_attributes configured" do
+    before do
+      Doorkeeper.configure do
+        custom_access_token_attributes [:tenant_id]
+      end
+    end
+
+    it "issues an access token with the custom access token attributes" do
+      request = described_class.new(server, client, scope: "email", tenant_id: 9000)
+      allow(request).to receive(:issuer).and_return(token_creator)
+      expect(token_creator).to receive(:create).with(client, Doorkeeper::OAuth::Scopes.from_string("email"), { tenant_id: 9000 })
+      request.authorize
+    end
+  end
+
+  context "with restricted client" do
+    let(:default_scopes) do
+      Doorkeeper::OAuth::Scopes.from_string("public email")
+    end
+    let(:server_scopes) do
+      Doorkeeper::OAuth::Scopes.from_string("public email phone")
+    end
+    let(:client_scopes) do
+      Doorkeeper::OAuth::Scopes.from_string("public phone")
+    end
 
     before do
-      subject.issuer = token_creator
+      allow(server).to receive(:default_scopes).and_return(default_scopes)
+      allow(server).to receive(:scopes).and_return(server_scopes)
+      allow(server).to receive(:access_token_expires_in).and_return(100)
+      allow(application).to receive(:scopes).and_return(client_scopes)
+      allow(client).to receive(:id).and_return(nil)
     end
 
-    it "issues an access token for the current client" do
-      expect(token_creator).to receive(:create).with(client, nil)
-      subject.authorize
+    it "delegates the error to issuer if no scope was requested" do
+      request = described_class.new(server, client)
+      request.authorize
+      expect(request.response).to be_a(Doorkeeper::OAuth::ErrorResponse)
+      expect(request.error).to eq(:invalid_scope)
     end
 
-    it "has successful response when issue was created" do
-      subject.authorize
-      expect(subject.response).to be_a(TokenResponse)
-    end
-
-    context "if issue was not created" do
-      before do
-        subject.issuer = double create: false, error: :invalid
-      end
-
-      it "has an error response" do
-        subject.authorize
-        expect(subject.response).to be_a(Doorkeeper::OAuth::ErrorResponse)
-      end
-
-      it "delegates the error to issuer" do
-        subject.authorize
-        expect(subject.error).to eq(:invalid)
-      end
-    end
-
-    context "with scopes" do
-      let(:default_scopes) { Doorkeeper::OAuth::Scopes.from_string("public email") }
-
-      before do
-        allow(server).to receive(:default_scopes).and_return(default_scopes)
-      end
-
-      it "issues an access token with default scopes if none was requested" do
-        expect(token_creator).to receive(:create).with(client, default_scopes)
-        subject.authorize
-      end
-
-      it "issues an access token with requested scopes" do
-        subject = ClientCredentialsRequest.new(server, client, scope: "email")
-        subject.issuer = token_creator
-        expect(token_creator).to receive(:create).with(client, Doorkeeper::OAuth::Scopes.from_string("email"))
-        subject.authorize
-      end
-    end
-
-    context "with restricted client" do
-      let(:default_scopes) do
-        Doorkeeper::OAuth::Scopes.from_string("public email")
-      end
-      let(:server_scopes) do
-        Doorkeeper::OAuth::Scopes.from_string("public email phone")
-      end
-      let(:client_scopes) do
-        Doorkeeper::OAuth::Scopes.from_string("public phone")
-      end
-
-      before do
-        allow(server).to receive(:default_scopes).and_return(default_scopes)
-        allow(server).to receive(:scopes).and_return(server_scopes)
-        allow(server).to receive(:access_token_expires_in).and_return(100)
-        allow(application).to receive(:scopes).and_return(client_scopes)
-        allow(client).to receive(:id).and_return(nil)
-      end
-
-      it "delegates the error to issuer if no scope was requested" do
-        subject = ClientCredentialsRequest.new(server, client)
-        subject.authorize
-        expect(subject.response).to be_a(Doorkeeper::OAuth::ErrorResponse)
-        expect(subject.error).to eq(:invalid_scope)
-      end
-
-      it "issues an access token with requested scopes" do
-        subject = ClientCredentialsRequest.new(server, client, scope: "phone")
-        subject.authorize
-        expect(subject.response).to be_a(Doorkeeper::OAuth::TokenResponse)
-        expect(subject.response.token.scopes_string).to eq("phone")
-      end
+    it "issues an access token with requested scopes" do
+      request = described_class.new(server, client, scope: "phone")
+      request.authorize
+      expect(request.response).to be_a(Doorkeeper::OAuth::TokenResponse)
+      expect(request.response.token.scopes_string).to eq("phone")
     end
   end
 end

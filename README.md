@@ -1,12 +1,11 @@
 # Doorkeeper — awesome OAuth 2 provider for your Rails / Grape app.
 
 [![Gem Version](https://badge.fury.io/rb/doorkeeper.svg)](https://rubygems.org/gems/doorkeeper)
-[![Build Status](https://travis-ci.org/doorkeeper-gem/doorkeeper.svg?branch=master)](https://travis-ci.org/doorkeeper-gem/doorkeeper)
+[![CI](https://github.com/doorkeeper-gem/doorkeeper/actions/workflows/ci.yml/badge.svg)](https://github.com/doorkeeper-gem/doorkeeper/actions/workflows/ci.yml)
 [![Code Climate](https://codeclimate.com/github/doorkeeper-gem/doorkeeper.svg)](https://codeclimate.com/github/doorkeeper-gem/doorkeeper)
-[![Coverage Status](https://coveralls.io/repos/github/doorkeeper-gem/doorkeeper/badge.svg?branch=master)](https://coveralls.io/github/doorkeeper-gem/doorkeeper?branch=master)
-[![Security](https://hakiri.io/github/doorkeeper-gem/doorkeeper/master.svg)](https://hakiri.io/github/doorkeeper-gem/doorkeeper/master)
+[![Coverage Status](https://coveralls.io/repos/github/doorkeeper-gem/doorkeeper/badge.svg?branch=main)](https://coveralls.io/github/doorkeeper-gem/doorkeeper?branch=main)
 [![Reviewed by Hound](https://img.shields.io/badge/Reviewed_by-Hound-8E64B0.svg)](https://houndci.com)
-[![GuardRails badge](https://badges.production.guardrails.io/doorkeeper-gem/doorkeeper.svg?token=66768ce8f6995814df81f65a2cff40f739f688492704f973e62809e15599bb62)](https://dashboard.guardrails.io/default/gh/doorkeeper-gem/doorkeeper)
+[![GuardRails badge](https://badges.guardrails.io/doorkeeper-gem/doorkeeper.svg?token=66768ce8f6995814df81f65a2cff40f739f688492704f973e62809e15599bb62)](https://dashboard.guardrails.io/default/gh/doorkeeper-gem/doorkeeper)
 [![Dependabot](https://img.shields.io/badge/dependabot-enabled-success.svg)](https://dependabot.com)
 
 Doorkeeper is a gem (Rails engine) that makes it easy to introduce OAuth 2 provider
@@ -14,18 +13,18 @@ functionality to your Ruby on Rails or Grape application.
 
 Supported features:
 
-- [The OAuth 2.0 Authorization Framework](https://tools.ietf.org/html/rfc6749)
-  - [Authorization Code Flow](http://tools.ietf.org/html/draft-ietf-oauth-v2-22#section-4.1)
-  - [Access Token Scopes](http://tools.ietf.org/html/draft-ietf-oauth-v2-22#section-3.3)
-  - [Refresh token](http://tools.ietf.org/html/draft-ietf-oauth-v2-22#section-1.5)
-  - [Implicit grant](http://tools.ietf.org/html/draft-ietf-oauth-v2-22#section-4.2)
-  - [Resource Owner Password Credentials](http://tools.ietf.org/html/draft-ietf-oauth-v2-22#section-4.3)
-  - [Client Credentials](http://tools.ietf.org/html/draft-ietf-oauth-v2-22#section-4.4)
-- [OAuth 2.0 Token Revocation](http://tools.ietf.org/html/rfc7009)
-- [OAuth 2.0 Token Introspection](https://tools.ietf.org/html/rfc7662)
-- [OAuth 2.0 Threat Model and Security Considerations](http://tools.ietf.org/html/rfc6819)
-- [OAuth 2.0 for Native Apps](https://tools.ietf.org/html/draft-ietf-oauth-native-apps-10)
-- [Proof Key for Code Exchange by OAuth Public Clients](https://tools.ietf.org/html/rfc7636)
+- [The OAuth 2.0 Authorization Framework](https://datatracker.ietf.org/doc/html/rfc6749)
+  - [Authorization Code Flow](https://datatracker.ietf.org/doc/html/rfc6749#section-4.1)
+  - [Access Token Scopes](https://datatracker.ietf.org/doc/html/rfc6749#section-3.3)
+  - [Refresh token](https://datatracker.ietf.org/doc/html/rfc6749#section-1.5)
+  - [Implicit grant](https://datatracker.ietf.org/doc/html/rfc6749#section-4.2)
+  - [Resource Owner Password Credentials](https://datatracker.ietf.org/doc/html/rfc6749#section-4.3)
+  - [Client Credentials](https://datatracker.ietf.org/doc/html/rfc6749#section-4.4)
+- [OAuth 2.0 Token Revocation](https://datatracker.ietf.org/doc/html/rfc7009)
+- [OAuth 2.0 Token Introspection](https://datatracker.ietf.org/doc/html/rfc7662)
+- [OAuth 2.0 Threat Model and Security Considerations](https://datatracker.ietf.org/doc/html/rfc6819)
+- [OAuth 2.0 for Native Apps](https://datatracker.ietf.org/doc/html/rfc8252)
+- [Proof Key for Code Exchange by OAuth Public Clients](https://datatracker.ietf.org/doc/html/rfc7636)
 
 ## Table of Contents
 
@@ -51,7 +50,7 @@ Supported features:
 
 ## Documentation
 
-This documentation is valid for `master` branch. Please check the documentation for the version of doorkeeper you are using in:
+This documentation is valid for `main` branch. Please check the documentation for the version of doorkeeper you are using in:
 https://github.com/doorkeeper-gem/doorkeeper/releases.
 
 Additionally, other resources can be found on:
@@ -106,6 +105,8 @@ Extensions that are not included by default and can be installed separately.
 | JWT Token support | [doorkeeper-gem/doorkeeper-jwt](https://github.com/doorkeeper-gem/doorkeeper-jwt) |
 | Assertion grant extension | [doorkeeper-gem/doorkeeper-grants\_assertion](https://github.com/doorkeeper-gem/doorkeeper-grants_assertion) |
 | I18n translations | [doorkeeper-gem/doorkeeper-i18n](https://github.com/doorkeeper-gem/doorkeeper-i18n) |
+| CIBA - Client Initiated Backchannel Authentication Flow extension | [doorkeeper-ciba](https://github.com/autoseg/doorkeeper-ciba) |
+| Device Authorization Grant | [doorkeeper-device_authorization_grant](https://github.com/exop-group/doorkeeper-device_authorization_grant) |
 
 ## Example Applications
 
@@ -113,7 +114,7 @@ These applications show how Doorkeeper works and how to integrate with it. Start
 
 | Application | Link |
 | :--- | :--- |
-| oAuth2 Server with Doorkeeper | [doorkeeper-gem/doorkeeper-provider-app](https://github.com/doorkeeper-gem/doorkeeper-provider-app) |
+| OAuth2 Server with Doorkeeper | [doorkeeper-gem/doorkeeper-provider-app](https://github.com/doorkeeper-gem/doorkeeper-provider-app) |
 | Sinatra Client connected to Provider App | [doorkeeper-gem/doorkeeper-sinatra-client](https://github.com/doorkeeper-gem/doorkeeper-sinatra-client) |
 | Devise + Omniauth Client | [doorkeeper-gem/doorkeeper-devise-client](https://github.com/doorkeeper-gem/doorkeeper-devise-client) |
 
@@ -133,6 +134,12 @@ See [list of tutorials](https://github.com/doorkeeper-gem/doorkeeper/wiki#how-to
 [![OpenCollective](https://opencollective.com/doorkeeper-gem/sponsors/badge.svg)](#sponsors)
 
 Support this project by becoming a sponsor. Your logo will show up here with a link to your website. [[Become a sponsor](https://opencollective.com/doorkeeper-gem#sponsor)]
+
+<a href="https://codecademy.com/about/careers?utm_source=doorkeeper-gem" target="_blank"><img src="https://static-assets.codecademy.com/marketing/codecademy_logo_padded.png"/></a>
+
+> Codecademy supports open source as part of its mission to democratize tech. Come help us build the education the world deserves: [https://codecademy.com/about/careers](https://codecademy.com/about/careers?utm_source=doorkeeper-gem)
+
+<br>
 
 <a href="https://oauth.io/?utm_source=doorkeeper-gem" target="_blank"><img src="https://oauth.io/img/logo_text.png"/></a>
 
@@ -160,6 +167,9 @@ tests with a specific Rails version:
 BUNDLE_GEMFILE=gemfiles/rails_6_0.gemfile bundle exec rake
 ```
 
+You can also experiment with the changes using `bin/console`. It uses in-memory SQLite database and default
+Doorkeeper config, but you can reestablish connection or reconfigure the gem if you need.
+
 ## Contributing
 
 Want to contribute and don't know where to start? Check out [features we're
@@ -168,8 +178,7 @@ create [example
 apps](https://github.com/doorkeeper-gem/doorkeeper/wiki/Example-Applications),
 integrate the gem with your app and let us know!
 
-Also, check out our [contributing guidelines
-page](https://github.com/doorkeeper-gem/doorkeeper/wiki/Contributing).
+Also, check out our [contributing guidelines page](CONTRIBUTING.md).
 
 ## Contributors
 
@@ -180,4 +189,4 @@ contributors](https://github.com/doorkeeper-gem/doorkeeper/graphs/contributors)!
 
 ## License
 
-MIT License. Copyright 2011 Applicake.
+MIT License. Created in Applicake. Maintained by the community.

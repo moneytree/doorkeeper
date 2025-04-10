@@ -2,7 +2,7 @@
 
 require "spec_helper"
 
-describe "ActionController::Metal API" do
+RSpec.describe "ActionController::Metal API" do
   before do
     @client   = FactoryBot.create(:application)
     @resource = User.create!(name: "Joe", password: "sekret")
@@ -11,6 +11,6 @@ describe "ActionController::Metal API" do
 
   it "client requests protected resource with valid token" do
     get "/metal.json?access_token=#{@token.token}"
-    should_have_json "ok", true
+    expect(json_response).to include("ok" => true)
   end
 end

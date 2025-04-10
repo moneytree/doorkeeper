@@ -16,18 +16,20 @@ module Doorkeeper
 
       # :doc:
       def current_resource_owner
+        return @current_resource_owner if defined?(@current_resource_owner)
+
         @current_resource_owner ||= begin
-          instance_eval(&Doorkeeper.configuration.authenticate_resource_owner)
+          instance_eval(&Doorkeeper.config.authenticate_resource_owner)
         end
       end
 
       def resource_owner_from_credentials
-        instance_eval(&Doorkeeper.configuration.resource_owner_from_credentials)
+        instance_eval(&Doorkeeper.config.resource_owner_from_credentials)
       end
 
       # :doc:
       def authenticate_admin!
-        instance_eval(&Doorkeeper.configuration.authenticate_admin)
+        instance_eval(&Doorkeeper.config.authenticate_admin)
       end
 
       def server
@@ -36,36 +38,40 @@ module Doorkeeper
 
       # :doc:
       def doorkeeper_token
-        @doorkeeper_token ||= OAuth::Token.authenticate request, *config_methods
+        return @doorkeeper_token if defined?(@doorkeeper_token)
+
+        @doorkeeper_token ||= OAuth::Token.authenticate(request, *config_methods)
       end
 
       def config_methods
-        @config_methods ||= Doorkeeper.configuration.access_token_methods
+        @config_methods ||= Doorkeeper.config.access_token_methods
       end
 
       def get_error_response_from_exception(exception)
         if exception.respond_to?(:response)
           exception.response
         elsif exception.type == :invalid_request
-          OAuth::InvalidRequestResponse.new(name: exception.type,
-                                            state: params[:state],
-                                            missing_param: exception.missing_param)
+          OAuth::InvalidRequestResponse.new(
+            name: exception.type,
+            state: params[:state],
+            missing_param: exception.missing_param,
+          )
         else
           OAuth::ErrorResponse.new(name: exception.type, state: params[:state])
         end
       end
 
       def handle_token_exception(exception)
-        error = get_error_response_from_exception exception
-        headers.merge! error.headers
+        error = get_error_response_from_exception(exception)
+        headers.merge!(error.headers)
         self.response_body = error.body.to_json
-        self.status        = error.status
+        self.status = error.status
       end
 
       def skip_authorization?
         !!instance_exec(
           [server.current_resource_owner, @pre_auth.client],
-          &Doorkeeper.configuration.skip_authorization
+          &Doorkeeper.config.skip_authorization
         )
       end
 
@@ -76,7 +82,7 @@ module Doorkeeper
       end
 
       def x_www_form_urlencoded?
-        request.content_type == "application/x-www-form-urlencoded"
+        request.media_type == "application/x-www-form-urlencoded"
       end
     end
   end

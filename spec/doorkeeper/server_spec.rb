@@ -2,17 +2,18 @@
 
 require "spec_helper"
 
-describe Doorkeeper::Server do
-  let(:fake_class) { double :fake_class }
-
-  subject do
-    described_class.new
+RSpec.describe Doorkeeper::Server do
+  subject(:server) do
+    described_class.new(context)
   end
+
+  let(:fake_class) { double :fake_class }
+  let(:context) { double :context }
 
   describe ".authorization_request" do
     it "raises error when strategy does not match phase" do
       expect do
-        subject.token_request(:code)
+        server.token_request(:code)
       end.to raise_error(Doorkeeper::Errors::InvalidTokenStrategy)
     end
 
@@ -25,25 +26,27 @@ describe Doorkeeper::Server do
 
       it "raises error when using the disabled Client Credentials strategy" do
         expect do
-          subject.token_request(:client_credentials)
+          server.token_request(:client_credentials)
         end.to raise_error(Doorkeeper::Errors::InvalidTokenStrategy)
       end
     end
 
     it "builds the request with selected strategy" do
       stub_const "Doorkeeper::Request::Code", fake_class
-      expect(fake_class).to receive(:new).with(subject)
-      subject.authorization_request :code
+      expect(fake_class).to receive(:new).with(server)
+      expect(::Kernel).to receive(:warn)
+      server.authorization_request :code
     end
 
     it "builds the request with composite strategy name" do
-      allow(Doorkeeper.configuration)
-        .to receive(:authorization_response_types)
-        .and_return(["id_token token"])
+      Doorkeeper.configure do
+        grant_flows ["id_token token"]
+      end
 
       stub_const "Doorkeeper::Request::IdTokenToken", fake_class
-      expect(fake_class).to receive(:new).with(subject)
-      subject.authorization_request "id_token token"
+      expect(fake_class).to receive(:new).with(server)
+      expect(::Kernel).to receive(:warn)
+      server.authorization_request "id_token token"
     end
   end
 end

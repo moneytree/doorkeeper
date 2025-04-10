@@ -2,53 +2,53 @@
 
 require "spec_helper"
 
-module Doorkeeper::OAuth
-  describe InvalidTokenResponse do
-    describe "#name" do
-      it { expect(subject.name).to eq(:invalid_token) }
-    end
+RSpec.describe Doorkeeper::OAuth::InvalidTokenResponse do
+  let(:response) { described_class.new }
 
-    describe "#status" do
-      it { expect(subject.status).to eq(:unauthorized) }
-    end
+  describe "#name" do
+    it { expect(response.name).to eq(:invalid_token) }
+  end
 
-    describe :from_access_token do
-      let(:response) { InvalidTokenResponse.from_access_token(access_token) }
+  describe "#status" do
+    it { expect(response.status).to eq(:unauthorized) }
+  end
 
-      context "revoked" do
-        let(:access_token) { double(revoked?: true, expired?: true) }
+  describe ".from_access_token" do
+    let(:response) { described_class.from_access_token(access_token) }
 
-        it "sets a description" do
-          expect(response.description).to include("revoked")
-        end
+    context "when token revoked" do
+      let(:access_token) { double(revoked?: true, expired?: true) }
 
-        it "sets the reason" do
-          expect(response.reason).to eq(:revoked)
-        end
+      it "sets a description" do
+        expect(response.description).to include("revoked")
       end
 
-      context "expired" do
-        let(:access_token) { double(revoked?: false, expired?: true) }
+      it "sets the reason" do
+        expect(response.reason).to eq(:revoked)
+      end
+    end
 
-        it "sets a description" do
-          expect(response.description).to include("expired")
-        end
+    context "when token expired" do
+      let(:access_token) { double(revoked?: false, expired?: true) }
 
-        it "sets the reason" do
-          expect(response.reason).to eq(:expired)
-        end
+      it "sets a description" do
+        expect(response.description).to include("expired")
       end
 
-      context "unknown" do
-        let(:access_token) { double(revoked?: false, expired?: false) }
+      it "sets the reason" do
+        expect(response.reason).to eq(:expired)
+      end
+    end
 
-        it "sets a description" do
-          expect(response.description).to include("invalid")
-        end
+    context "when unknown" do
+      let(:access_token) { double(revoked?: false, expired?: false) }
 
-        it "sets the reason" do
-          expect(response.reason).to eq(:unknown)
-        end
+      it "sets a description" do
+        expect(response.description).to include("invalid")
+      end
+
+      it "sets the reason" do
+        expect(response.reason).to eq(:unknown)
       end
     end
   end

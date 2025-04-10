@@ -18,7 +18,7 @@ module Doorkeeper
 
         scopes = if endpoint_scopes
                    Doorkeeper::OAuth::Scopes.from_array(endpoint_scopes)
-                 elsif scopes && !scopes.empty?
+                 elsif scopes.present?
                    Doorkeeper::OAuth::Scopes.from_array(scopes)
                  end
 
@@ -39,7 +39,7 @@ module Doorkeeper
       def doorkeeper_token
         @doorkeeper_token ||= OAuth::Token.authenticate(
           decorated_request,
-          *Doorkeeper.configuration.access_token_methods
+          *Doorkeeper.config.access_token_methods,
         )
       end
 

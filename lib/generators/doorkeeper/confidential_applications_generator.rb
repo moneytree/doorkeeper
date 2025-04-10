@@ -12,11 +12,11 @@ module Doorkeeper
     source_root File.expand_path("templates", __dir__)
     desc "Add confidential column to Doorkeeper applications"
 
-    def pkce
+    def confidential_applications
       migration_template(
         "add_confidential_to_applications.rb.erb",
         "db/migrate/add_confidential_to_applications.rb",
-        migration_version: migration_version
+        migration_version: migration_version,
       )
     end
 

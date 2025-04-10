@@ -5,13 +5,15 @@ module Doorkeeper
     class ErrorResponse < BaseResponse
       include OAuth::Helpers
 
+      NON_REDIRECTABLE_STATES = %i[invalid_redirect_uri invalid_client unauthorized_client].freeze
+
       def self.from_request(request, attributes = {})
         new(
           attributes.merge(
             name: request.error,
             state: request.try(:state),
-            redirect_uri: request.try(:redirect_uri)
-          )
+            redirect_uri: request.try(:redirect_uri),
+          ),
         )
       end
 
@@ -32,7 +34,7 @@ module Doorkeeper
       end
 
       def status
-        if name == :invalid_client
+        if name == :invalid_client || name == :unauthorized_client
           :unauthorized
         else
           :bad_request
@@ -40,22 +42,20 @@ module Doorkeeper
       end
 
       def redirectable?
-        name != :invalid_redirect_uri && name != :invalid_client &&
-          !URIChecker.oob_uri?(@redirect_uri)
+        !NON_REDIRECTABLE_STATES.include?(name) && !URIChecker.oob_uri?(@redirect_uri)
       end
 
       def redirect_uri
         if @response_on_fragment
-          Authorization::URIBuilder.uri_with_fragment @redirect_uri, body
+          Authorization::URIBuilder.uri_with_fragment(@redirect_uri, body)
         else
-          Authorization::URIBuilder.uri_with_query @redirect_uri, body
+          Authorization::URIBuilder.uri_with_query(@redirect_uri, body)
         end
       end
 
       def headers
         {
-          "Cache-Control" => "no-store",
-          "Pragma" => "no-cache",
+          "Cache-Control" => "no-store, no-cache",
           "Content-Type" => "application/json; charset=utf-8",
           "WWW-Authenticate" => authenticate_info,
         }
@@ -67,10 +67,8 @@ module Doorkeeper
 
       protected
 
-      delegate :realm, to: :configuration
-
-      def configuration
-        Doorkeeper.configuration
+      def realm
+        Doorkeeper.config.realm
       end
 
       def exception_class

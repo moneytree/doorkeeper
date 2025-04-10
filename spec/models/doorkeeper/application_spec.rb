@@ -3,10 +3,9 @@
 require "spec_helper"
 require "bcrypt"
 
-describe Doorkeeper::Application do
-  let(:require_owner) { Doorkeeper.configuration.instance_variable_set("@confirm_application_owner", true) }
-  let(:unset_require_owner) { Doorkeeper.configuration.instance_variable_set("@confirm_application_owner", false) }
+RSpec.describe Doorkeeper::Application do
   let(:new_application) { FactoryBot.build(:application) }
+  let(:owner) { FactoryBot.build_stubbed(:doorkeeper_testing_user) }
 
   let(:uid) { SecureRandom.hex(8) }
   let(:secret) { SecureRandom.hex(8) }
@@ -83,17 +82,32 @@ describe Doorkeeper::Application do
     expect(new_application).not_to be_valid
   end
 
-  context "application_owner is enabled" do
-    before do
-      Doorkeeper.configure do
-        orm DOORKEEPER_ORM
-        enable_application_owner
+  it "generates a secret using a custom object" do
+    module CustomGeneratorArgs
+      def self.generate
+        "custom_application_secret"
       end
     end
 
-    context "application owner is not required" do
-      before(:each) do
-        unset_require_owner
+    Doorkeeper.configure do
+      orm DOORKEEPER_ORM
+      application_secret_generator "CustomGeneratorArgs"
+    end
+
+    expect(new_application.secret).to be_nil
+    new_application.save
+    expect(new_application.secret).to eq("custom_application_secret")
+  end
+
+  context "when application_owner is enabled" do
+    context "when application owner is not required" do
+      before do
+        Doorkeeper.configure do
+          orm DOORKEEPER_ORM
+          enable_application_owner
+        end
+
+        Doorkeeper.run_orm_hooks
       end
 
       it "is valid given valid attributes" do
@@ -101,10 +115,14 @@ describe Doorkeeper::Application do
       end
     end
 
-    context "application owner is required" do
+    context "when application owner is required" do
       before do
-        require_owner
-        @owner = FactoryBot.build_stubbed(:doorkeeper_testing_user)
+        Doorkeeper.configure do
+          orm DOORKEEPER_ORM
+          enable_application_owner confirmation: true
+        end
+
+        Doorkeeper.run_orm_hooks
       end
 
       it "is invalid without an owner" do
@@ -112,16 +130,17 @@ describe Doorkeeper::Application do
       end
 
       it "is valid with an owner" do
-        new_application.owner = @owner
+        new_application.owner = owner
         expect(new_application).to be_valid
       end
     end
   end
 
-  context "redirect URI" do
+  describe "redirect URI" do
     context "when grant flows allow blank redirect URI" do
       before do
         Doorkeeper.configure do
+          orm DOORKEEPER_ORM
           grant_flows %w[password client_credentials]
         end
       end
@@ -136,6 +155,7 @@ describe Doorkeeper::Application do
     context "when grant flows require redirect URI" do
       before do
         Doorkeeper.configure do
+          orm DOORKEEPER_ORM
           grant_flows %w[password client_credentials authorization_code]
         end
       end
@@ -150,6 +170,7 @@ describe Doorkeeper::Application do
     context "when blank URI option disabled" do
       before do
         Doorkeeper.configure do
+          orm DOORKEEPER_ORM
           grant_flows %w[password client_credentials]
           allow_blank_redirect_uri false
         end
@@ -179,6 +200,7 @@ describe Doorkeeper::Application do
       # will always be true
       before do
         Doorkeeper.configure do
+          orm DOORKEEPER_ORM
           hash_application_secrets using: "Doorkeeper::SecretStoring::BCrypt"
         end
       end
@@ -218,23 +240,24 @@ describe Doorkeeper::Application do
   end
 
   describe "destroy related models on cascade" do
-    before(:each) do
+    before do
       new_application.save
     end
 
-    let(:resource_owner) { FactoryBot.create(:doorkeeper_testing_user) }
+    let(:resource_owner) { FactoryBot.create(:resource_owner) }
 
-    it "should destroy its access grants" do
+    it "destroys its access grants" do
       FactoryBot.create(
         :access_grant,
         application: new_application,
         resource_owner_id: resource_owner.id,
+        resource_owner_type: resource_owner.class.name,
       )
 
       expect { new_application.destroy }.to change { Doorkeeper::AccessGrant.count }.by(-1)
     end
 
-    it "should destroy its access tokens" do
+    it "destroys its access tokens" do
       FactoryBot.create(:access_token, application: new_application)
       FactoryBot.create(:access_token, application: new_application, revoked_at: Time.now.utc)
       expect do
@@ -263,13 +286,14 @@ describe Doorkeeper::Application do
 
   describe "#redirect_uri=" do
     context "when array of valid redirect_uris" do
-      it "should join by newline" do
+      it "joins by newline" do
         new_application.redirect_uri = ["http://localhost/callback1", "http://localhost/callback2"]
         expect(new_application.redirect_uri).to eq("http://localhost/callback1\nhttp://localhost/callback2")
       end
     end
+
     context "when string of valid redirect_uris" do
-      it "should store as-is" do
+      it "stores as-is" do
         new_application.redirect_uri = "http://localhost/callback1\nhttp://localhost/callback2"
         expect(new_application.redirect_uri).to eq("http://localhost/callback1\nhttp://localhost/callback2")
       end
@@ -279,7 +303,7 @@ describe Doorkeeper::Application do
   describe "#renew_secret" do
     let(:app) { FactoryBot.create :application }
 
-    it "should generate a new secret" do
+    it "generates a new secret" do
       old_secret = app.secret
       app.renew_secret
       expect(old_secret).not_to eq(app.secret)
@@ -287,8 +311,8 @@ describe Doorkeeper::Application do
   end
 
   describe "#authorized_for" do
-    let(:resource_owner) { FactoryBot.create(:doorkeeper_testing_user) }
-    let(:other_resource_owner) { FactoryBot.create(:doorkeeper_testing_user) }
+    let(:resource_owner) { FactoryBot.create(:resource_owner) }
+    let(:other_resource_owner) { FactoryBot.create(:resource_owner) }
 
     it "is empty if the application is not authorized for anyone" do
       expect(described_class.authorized_for(resource_owner)).to be_empty
@@ -298,10 +322,12 @@ describe Doorkeeper::Application do
       FactoryBot.create(
         :access_token,
         resource_owner_id: other_resource_owner.id,
+        resource_owner_type: other_resource_owner.class.name,
       )
       token = FactoryBot.create(
         :access_token,
         resource_owner_id: resource_owner.id,
+        resource_owner_type: resource_owner.class.name,
       )
       expect(described_class.authorized_for(resource_owner)).to eq([token.application])
     end
@@ -310,6 +336,7 @@ describe Doorkeeper::Application do
       FactoryBot.create(
         :access_token,
         resource_owner_id: resource_owner.id,
+        resource_owner_type: resource_owner.class.name,
         revoked_at: 2.days.ago,
       )
       expect(described_class.authorized_for(resource_owner)).to be_empty
@@ -319,10 +346,12 @@ describe Doorkeeper::Application do
       token1 = FactoryBot.create(
         :access_token,
         resource_owner_id: resource_owner.id,
+        resource_owner_type: resource_owner.class.name,
       )
       token2 = FactoryBot.create(
         :access_token,
         resource_owner_id: resource_owner.id,
+        resource_owner_type: resource_owner.class.name,
       )
       expect(described_class.authorized_for(resource_owner))
         .to eq([token1.application, token2.application])
@@ -333,11 +362,13 @@ describe Doorkeeper::Application do
       FactoryBot.create(
         :access_token,
         resource_owner_id: resource_owner.id,
+        resource_owner_type: resource_owner.class.name,
         application: application,
       )
       FactoryBot.create(
         :access_token,
         resource_owner_id: resource_owner.id,
+        resource_owner_type: resource_owner.class.name,
         application: application,
       )
       expect(described_class.authorized_for(resource_owner)).to eq([application])
@@ -364,8 +395,9 @@ describe Doorkeeper::Application do
         authenticated = described_class.by_uid_and_secret(app.uid, app.secret)
         expect(authenticated).to eq(app)
       end
+
       context "when secret is wrong" do
-        it "should not find the application" do
+        it "does not find the application" do
           app = FactoryBot.create :application
           authenticated = described_class.by_uid_and_secret(app.uid, "bad")
           expect(authenticated).to eq(nil)
@@ -375,14 +407,15 @@ describe Doorkeeper::Application do
 
     context "when application is public/non-confidential" do
       context "when secret is blank" do
-        it "should find the application" do
+        it "finds the application" do
           app = FactoryBot.create :application, confidential: false
           authenticated = described_class.by_uid_and_secret(app.uid, nil)
           expect(authenticated).to eq(app)
         end
       end
+
       context "when secret is wrong" do
-        it "should not find the application" do
+        it "does not find the application" do
           app = FactoryBot.create :application, confidential: false
           authenticated = described_class.by_uid_and_secret(app.uid, "bad")
           expect(authenticated).to eq(nil)
@@ -392,16 +425,20 @@ describe Doorkeeper::Application do
   end
 
   describe "#confidential?" do
-    subject { FactoryBot.create(:application, confidential: confidential).confidential? }
+    let(:app) do
+      FactoryBot.create(:application, confidential: confidential)
+    end
 
     context "when application is private/confidential" do
       let(:confidential) { true }
-      it { expect(subject).to eq(true) }
+
+      it { expect(app).to be_confidential }
     end
 
     context "when application is public/non-confidential" do
       let(:confidential) { false }
-      it { expect(subject).to eq(false) }
+
+      it { expect(app).not_to be_confidential }
     end
   end
 
@@ -427,7 +464,7 @@ describe Doorkeeper::Application do
         expect(app.as_json).to match(
           "id" => app.id,
           "name" => app.name,
-          "created_at" => an_instance_of(String),
+          "created_at" => anything,
         )
       end
 
@@ -437,7 +474,7 @@ describe Doorkeeper::Application do
         expect(app.as_json).to match(
           "id" => app.id,
           "name" => app.name,
-          "created_at" => an_instance_of(String),
+          "created_at" => anything,
           "uid" => app.uid,
         )
       end
@@ -447,13 +484,12 @@ describe Doorkeeper::Application do
         expect(app.as_json(only: %i[name created_at secret]))
           .to match(
             "name" => app.name,
-            "created_at" => an_instance_of(String),
+            "created_at" => anything,
           )
       end
     end
 
     context "when called with authorized resource owner" do
-      let(:owner) { FactoryBot.create(:doorkeeper_testing_user) }
       let(:other_owner) { FactoryBot.create(:doorkeeper_testing_user) }
       let(:app) { FactoryBot.create(:application, secret: "123123123", owner: owner) }
 
@@ -462,6 +498,8 @@ describe Doorkeeper::Application do
           orm DOORKEEPER_ORM
           enable_application_owner confirmation: false
         end
+
+        Doorkeeper.run_orm_hooks
       end
 
       it "includes all the attributes" do
@@ -478,5 +516,48 @@ describe Doorkeeper::Application do
           .not_to include("redirect_uri")
       end
     end
+  end
+
+  context "when custom model class configured" do
+    class CustomApp < ::ActiveRecord::Base
+      include Doorkeeper::Orm::ActiveRecord::Mixins::Application
+    end
+
+    let(:new_application) { CustomApp.new(FactoryBot.attributes_for(:application)) }
+
+    context "without confirmation" do
+      before do
+        Doorkeeper.configure do
+          orm DOORKEEPER_ORM
+          application_class "CustomApp"
+          enable_application_owner confirmation: false
+        end
+
+        Doorkeeper.run_orm_hooks
+      end
+
+      it "is valid given valid attributes" do
+        expect(new_application).to be_valid
+      end
+    end
+
+    context "without confirmation" do
+      before do
+        Doorkeeper.configure do
+          orm DOORKEEPER_ORM
+          application_class "CustomApp"
+          enable_application_owner confirmation: true
+        end
+
+        Doorkeeper.run_orm_hooks
+      end
+
+      it "is invalid without owner" do
+        expect(new_application).not_to be_valid
+        new_application.owner = owner
+        expect(new_application).to be_valid
+      end
+    end
+
   end
 end

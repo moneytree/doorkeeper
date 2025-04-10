@@ -2,7 +2,7 @@
 
 require "spec_helper"
 
-describe Doorkeeper::DashboardHelper do
+RSpec.describe Doorkeeper::DashboardHelper do
   describe "#doorkeeper_errors_for" do
     let(:object) { double errors: { method: messages } }
     let(:messages) { ["first message", "second message"] }
@@ -11,7 +11,7 @@ describe Doorkeeper::DashboardHelper do
       it "returns error messages" do
         messages.each do |message|
           expect(helper.doorkeeper_errors_for(object, :method)).to include(
-            message.capitalize
+            message.capitalize,
           )
         end
       end

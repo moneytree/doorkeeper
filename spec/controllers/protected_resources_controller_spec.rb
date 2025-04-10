@@ -16,8 +16,8 @@ module ControllerActions
   def doorkeeper_forbidden_render_options(*); end
 end
 
-describe "doorkeeper authorize filter" do
-  context "accepts token code specified as" do
+RSpec.describe "doorkeeper authorize filter" do
+  context "when accepts token code specified as" do
     controller do
       before_action :doorkeeper_authorize!
 
@@ -28,9 +28,11 @@ describe "doorkeeper authorize filter" do
 
     let(:token_string) { "1A2BC3" }
     let(:token) do
-      double(Doorkeeper::AccessToken,
-             acceptable?: true, previous_refresh_token: "",
-             revoke_previous_refresh_token!: true)
+      double(
+        Doorkeeper::AccessToken,
+        acceptable?: true, previous_refresh_token: "",
+        revoke_previous_refresh_token!: true,
+      )
     end
 
     it "access_token param" do
@@ -56,7 +58,7 @@ describe "doorkeeper authorize filter" do
     end
 
     it "does not change Authorization header value" do
-      expect(Doorkeeper::AccessToken).to receive(:by_token).exactly(2).times.and_return(token)
+      expect(Doorkeeper::AccessToken).to receive(:by_token).twice.and_return(token)
       request.env["HTTP_AUTHORIZATION"] = "Bearer #{token_string}"
       get :index
       controller.send(:remove_instance_variable, :@doorkeeper_token)
@@ -64,7 +66,7 @@ describe "doorkeeper authorize filter" do
     end
   end
 
-  context "defined for all actions" do
+  context "when defined for all actions" do
     controller do
       before_action :doorkeeper_authorize!
 
@@ -98,7 +100,7 @@ describe "doorkeeper authorize filter" do
     end
   end
 
-  context "defined with scopes" do
+  context "when defined with scopes" do
     controller do
       before_action -> { doorkeeper_authorize! :write }
 
@@ -108,13 +110,15 @@ describe "doorkeeper authorize filter" do
     let(:token_string) { "1A2DUWE" }
 
     it "allows if the token has particular scopes" do
-      token = double(Doorkeeper::AccessToken,
-                     accessible?: true, scopes: %w[write public],
-                     previous_refresh_token: "",
-                     revoke_previous_refresh_token!: true)
+      token = double(
+        Doorkeeper::AccessToken,
+        accessible?: true, scopes: %w[write public],
+        previous_refresh_token: "",
+        revoke_previous_refresh_token!: true,
+      )
       expect(token).to receive(:acceptable?).with([:write]).and_return(true)
       expect(
-        Doorkeeper::AccessToken
+        Doorkeeper::AccessToken,
       ).to receive(:by_token).with(token_string).and_return(token)
 
       get :index, params: { access_token: token_string }
@@ -122,18 +126,20 @@ describe "doorkeeper authorize filter" do
     end
 
     it "does not allow if the token does not include given scope" do
-      token = double(Doorkeeper::AccessToken,
-                     accessible?: true, scopes: ["public"], revoked?: false,
-                     expired?: false, previous_refresh_token: "",
-                     revoke_previous_refresh_token!: true)
+      token = double(
+        Doorkeeper::AccessToken,
+        accessible?: true, scopes: ["public"], revoked?: false,
+        expired?: false, previous_refresh_token: "",
+        revoke_previous_refresh_token!: true,
+      )
       expect(
-        Doorkeeper::AccessToken
+        Doorkeeper::AccessToken,
       ).to receive(:by_token).with(token_string).and_return(token)
       expect(token).to receive(:acceptable?).with([:write]).and_return(false)
 
       get :index, params: { access_token: token_string }
       expect(response.status).to eq 403
-      expect(response.header).to_not include("WWW-Authenticate")
+      expect(response.header).not_to include("WWW-Authenticate")
     end
   end
 
@@ -163,7 +169,7 @@ describe "doorkeeper authorize filter" do
         end
       end
 
-      it "it renders a custom JSON response", token: :invalid do
+      it "renders a custom JSON response", token: :invalid do
         get :index, params: { access_token: token_string }
         expect(response.status).to eq 401
         expect(response.content_type).to include("application/json")
@@ -193,7 +199,7 @@ describe "doorkeeper authorize filter" do
         end
       end
 
-      it "it renders a custom text response", token: :invalid do
+      it "renders a custom text response", token: :invalid do
         get :index, params: { access_token: token_string }
         expect(response.status).to eq 401
         expect(response.content_type).to include("text/plain")
@@ -224,10 +230,12 @@ describe "doorkeeper authorize filter" do
     end
 
     let(:token) do
-      double(Doorkeeper::AccessToken,
-             accessible?: true, scopes: ["public"], revoked?: false,
-             expired?: false, previous_refresh_token: "",
-             revoke_previous_refresh_token!: true)
+      double(
+        Doorkeeper::AccessToken,
+        accessible?: true, scopes: ["public"], revoked?: false,
+        expired?: false, previous_refresh_token: "",
+        revoke_previous_refresh_token!: true,
+      )
     end
 
     let(:token_string) { "1A2DUWE" }
@@ -245,7 +253,7 @@ describe "doorkeeper authorize filter" do
 
       it "renders a custom JSON response" do
         get :index, params: { access_token: token_string }
-        expect(response.header).to_not include("WWW-Authenticate")
+        expect(response.header).not_to include("WWW-Authenticate")
         expect(response.content_type).to include("application/json")
         expect(response.status).to eq 403
 
@@ -284,7 +292,7 @@ describe "doorkeeper authorize filter" do
 
       it "renders a custom status code and text response" do
         get :index, params: { access_token: token_string }
-        expect(response.header).to_not include("WWW-Authenticate")
+        expect(response.header).not_to include("WWW-Authenticate")
         expect(response.status).to eq 403
         expect(response.body).to eq("Forbidden")
       end
@@ -309,7 +317,7 @@ describe "doorkeeper authorize filter" do
   end
 
   context "when handle_auth_errors option is set to :raise" do
-    subject { get :index, params: { access_token: token_string } }
+    subject(:request) { get :index, params: { access_token: token_string } }
 
     before do
       config_is_set(:handle_auth_errors, :raise)
@@ -322,25 +330,25 @@ describe "doorkeeper authorize filter" do
 
     context "when token is unknown" do
       it "raises Doorkeeper::Errors::TokenUnknown exception", token: :invalid do
-        expect { subject }.to raise_error(Doorkeeper::Errors::TokenUnknown)
+        expect { request }.to raise_error(Doorkeeper::Errors::TokenUnknown)
       end
     end
 
     context "when token is expired" do
       it "raises Doorkeeper::Errors::TokenExpired exception", token: :expired do
-        expect { subject }.to raise_error(Doorkeeper::Errors::TokenExpired)
+        expect { request }.to raise_error(Doorkeeper::Errors::TokenExpired)
       end
     end
 
     context "when token is revoked" do
       it "raises Doorkeeper::Errors::TokenRevoked exception", token: :revoked do
-        expect { subject }.to raise_error(Doorkeeper::Errors::TokenRevoked)
+        expect { request }.to raise_error(Doorkeeper::Errors::TokenRevoked)
       end
     end
 
     context "when token is forbidden" do
       it "raises Doorkeeper::Errors::TokenForbidden exception", token: :forbidden do
-        expect { subject }.to raise_error(Doorkeeper::Errors::TokenForbidden)
+        expect { request }.to raise_error(Doorkeeper::Errors::TokenForbidden)
       end
     end
 

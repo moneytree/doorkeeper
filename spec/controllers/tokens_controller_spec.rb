@@ -2,12 +2,15 @@
 
 require "spec_helper"
 
-describe Doorkeeper::TokensController do
+RSpec.describe Doorkeeper::TokensController do
+  subject(:json) { JSON.parse(response.body) }
+
   let(:client) { FactoryBot.create :application }
   let!(:user)  { User.create!(name: "Joe", password: "sekret") }
 
   before do
     Doorkeeper.configure do
+      orm DOORKEEPER_ORM
       resource_owner_from_credentials do
         User.first
       end
@@ -15,8 +18,6 @@ describe Doorkeeper::TokensController do
 
     allow(Doorkeeper.configuration).to receive(:grant_flows).and_return(["password"])
   end
-
-  subject { JSON.parse(response.body) }
 
   describe "POST #create" do
     before do
@@ -32,15 +33,15 @@ describe Doorkeeper::TokensController do
     end
 
     it "includes access token in response" do
-      expect(subject["access_token"]).to eq(Doorkeeper::AccessToken.first.token)
+      expect(json["access_token"]).to eq(Doorkeeper::AccessToken.first.token)
     end
 
     it "includes token type in response" do
-      expect(subject["token_type"]).to eq("Bearer")
+      expect(json["token_type"]).to eq("Bearer")
     end
 
     it "includes token expiration in response" do
-      expect(subject["expires_in"].to_i).to eq(Doorkeeper.configuration.access_token_expires_in)
+      expect(json["expires_in"].to_i).to eq(Doorkeeper.configuration.access_token_expires_in)
     end
 
     it "issues the token for the current client" do
@@ -66,23 +67,23 @@ describe Doorkeeper::TokensController do
     end
 
     it "include error in response" do
-      expect(subject["error"]).to eq("invalid_client")
+      expect(json["error"]).to eq("invalid_client")
     end
 
     it "include error_description in response" do
-      expect(subject["error_description"]).to be
+      expect(json["error_description"]).to be_present
     end
 
     it "does not include access token in response" do
-      expect(subject["access_token"]).to be_nil
+      expect(json["access_token"]).to be_nil
     end
 
     it "does not include token type in response" do
-      expect(subject["token_type"]).to be_nil
+      expect(json["token_type"]).to be_nil
     end
 
     it "does not include token expiration in response" do
-      expect(subject["expires_in"]).to be_nil
+      expect(json["expires_in"]).to be_nil
     end
 
     it "does not issue any access token" do
@@ -104,14 +105,15 @@ describe Doorkeeper::TokensController do
         }
       end
 
-      it "should call :before_successful_authorization callback" do
+      it "calls :before_successful_authorization callback" do
         expect(Doorkeeper.configuration)
-          .to receive_message_chain(:before_successful_authorization, :call).with(instance_of(described_class))
+          .to receive_message_chain(:before_successful_authorization, :call).with(instance_of(described_class), nil)
       end
 
-      it "should call :after_successful_authorization callback" do
+      it "calls :after_successful_authorization callback" do
         expect(Doorkeeper.configuration)
-          .to receive_message_chain(:after_successful_authorization, :call).with(instance_of(described_class))
+          .to receive_message_chain(:after_successful_authorization, :call)
+          .with(instance_of(described_class), instance_of(Doorkeeper::OAuth::Hooks::Context))
       end
     end
 
@@ -124,12 +126,12 @@ describe Doorkeeper::TokensController do
         }
       end
 
-      it "should call :before_successful_authorization callback" do
+      it "calls :before_successful_authorization callback" do
         expect(Doorkeeper.configuration)
-          .to receive_message_chain(:before_successful_authorization, :call).with(instance_of(described_class))
+          .to receive_message_chain(:before_successful_authorization, :call).with(instance_of(described_class), nil)
       end
 
-      it "should not call :after_successful_authorization callback" do
+      it "does not call :after_successful_authorization callback" do
         expect(Doorkeeper.configuration).not_to receive(:after_successful_authorization)
       end
     end
@@ -142,7 +144,7 @@ describe Doorkeeper::TokensController do
       allow(I18n).to receive(:translate)
         .with(
           custom_message,
-          hash_including(scope: %i[doorkeeper errors messages])
+          hash_including(scope: %i[doorkeeper errors messages]),
         )
         .and_return("Authorization custom message")
 
@@ -165,7 +167,7 @@ describe Doorkeeper::TokensController do
     end
   end
 
-  # http://tools.ietf.org/html/rfc7009#section-2.2
+  # https://datatracker.ietf.org/doc/html/rfc7009#section-2.2
   describe "POST #revoke" do
     let(:client) { FactoryBot.create(:application) }
     let(:access_token) { FactoryBot.create(:access_token, application: client) }
@@ -174,13 +176,13 @@ describe Doorkeeper::TokensController do
       let(:client) { FactoryBot.create(:application, confidential: false) }
 
       it "returns 200" do
-        post :revoke, params: { token: access_token.token }
+        post :revoke, params: { client_id: client.uid, token: access_token.token }
 
         expect(response.status).to eq 200
       end
 
       it "revokes the access token" do
-        post :revoke, params: { token: access_token.token }
+        post :revoke, params: { client_id: client.uid, token: access_token.token }
 
         expect(access_token.reload).to have_attributes(revoked?: true)
       end
@@ -189,9 +191,11 @@ describe Doorkeeper::TokensController do
     context "when associated app is confidential" do
       let(:client) { FactoryBot.create(:application, confidential: true) }
       let(:oauth_client) { Doorkeeper::OAuth::Client.new(client) }
+      let(:server) { instance_double(Doorkeeper::Server) }
 
-      before(:each) do
-        allow_any_instance_of(Doorkeeper::Server).to receive(:client) { oauth_client }
+      before do
+        allow(Doorkeeper::Server).to receive(:new).and_return(server)
+        allow(server).to receive(:client).and_return(oauth_client)
       end
 
       it "returns 200" do
@@ -230,30 +234,35 @@ describe Doorkeeper::TokensController do
     let(:access_token) { FactoryBot.create(:access_token, application: client) }
     let(:token_for_introspection) { FactoryBot.create(:access_token, application: client) }
 
-    context "authorized using valid Bearer token" do
+    context "when authorized using valid Bearer token" do
       it "responds with full token introspection" do
         request.headers["Authorization"] = "Bearer #{access_token.token}"
 
         post :introspect, params: { token: token_for_introspection.token }
 
-        should_have_json "active", true
+        expect(json_response).to include("active" => true)
         expect(json_response).to include("client_id", "token_type", "exp", "iat")
       end
     end
 
-    context "authorized using Client Credentials of the client that token is issued to" do
+    context "when authorized using Client Credentials of the client that token is issued to" do
       it "responds with full token introspection" do
         request.headers["Authorization"] = basic_auth_header_for_client(client)
 
         post :introspect, params: { token: token_for_introspection.token }
 
-        should_have_json "active", true
-        expect(json_response).to include("client_id", "token_type", "exp", "iat")
-        should_have_json "client_id", client.uid
+        expect(json_response).to match(
+          "active" => true,
+          "client_id" => client.uid,
+          "token_type" => "Bearer",
+          "scope" => nil,
+          "exp" => an_instance_of(Integer),
+          "iat" => an_instance_of(Integer),
+        )
       end
     end
 
-    context "configured token introspection disabled" do
+    context "when token introspection disabled" do
       before do
         Doorkeeper.configure do
           orm DOORKEEPER_ORM
@@ -268,12 +277,12 @@ describe Doorkeeper::TokensController do
 
         response_status_should_be 401
 
-        should_not_have_json "active"
-        should_have_json "error", "invalid_token"
+        expect(json_response).not_to include("active")
+        expect(json_response).to include("error" => "invalid_token")
       end
     end
 
-    context "using custom introspection response" do
+    context "when custom introspection response configured" do
       before do
         Doorkeeper.configure do
           orm DOORKEEPER_ORM
@@ -291,13 +300,20 @@ describe Doorkeeper::TokensController do
 
         post :introspect, params: { token: token_for_introspection.token }
 
-        expect(json_response).to include("client_id", "token_type", "exp", "iat", "sub", "aud")
-        should_have_json "sub", "Z5O3upPC88QrAjx00dis"
-        should_have_json "aud", "https://protected.example.net/resource"
+        expect(json_response).to match(
+          "active" => true,
+          "client_id" => client.uid,
+          "token_type" => "Bearer",
+          "scope" => nil,
+          "exp" => an_instance_of(Integer),
+          "iat" => an_instance_of(Integer),
+          "aud" => "https://protected.example.net/resource",
+          "sub" => "Z5O3upPC88QrAjx00dis",
+        )
       end
     end
 
-    context "public access token" do
+    context "when access token is public" do
       let(:token_for_introspection) { FactoryBot.create(:access_token, application: nil) }
 
       it "responds with full token introspection" do
@@ -305,13 +321,18 @@ describe Doorkeeper::TokensController do
 
         post :introspect, params: { token: token_for_introspection.token }
 
-        should_have_json "active", true
-        expect(json_response).to include("client_id", "token_type", "exp", "iat")
-        should_have_json "client_id", nil
+        expect(json_response).to match(
+          "active" => true,
+          "client_id" => nil,
+          "token_type" => "Bearer",
+          "scope" => nil,
+          "exp" => an_instance_of(Integer),
+          "iat" => an_instance_of(Integer),
+        )
       end
     end
 
-    context "token was issued to a different client than is making this request" do
+    context "when token was issued to a different client than is making this request" do
       let(:different_client) { FactoryBot.create(:application) }
 
       it "responds with only active state" do
@@ -321,12 +342,11 @@ describe Doorkeeper::TokensController do
 
         expect(response).to be_successful
 
-        should_have_json "active", false
-        expect(json_response).not_to include("client_id", "token_type", "exp", "iat")
+        expect(json_response).to match("active" => false)
       end
     end
 
-    context "introspection request authorized by a client and allow_token_introspection is true" do
+    context "when introspection request authorized by a client and allow_token_introspection is true" do
       let(:different_client) { FactoryBot.create(:application) }
 
       before do
@@ -340,13 +360,18 @@ describe Doorkeeper::TokensController do
 
         post :introspect, params: { token: token_for_introspection.token }
 
-        should_have_json "active", true
-        expect(json_response).to include("client_id", "token_type", "exp", "iat")
-        should_have_json "client_id", client.uid
+        expect(json_response).to match(
+          "active" => true,
+          "client_id" => client.uid,
+          "token_type" => "Bearer",
+          "scope" => nil,
+          "exp" => an_instance_of(Integer),
+          "iat" => an_instance_of(Integer),
+        )
       end
     end
 
-    context "allow_token_introspection requires authorized token with special scope" do
+    context "when allow_token_introspection requires authorized token with special scope" do
       let(:access_token) { FactoryBot.create(:access_token, scopes: "introspection") }
 
       before do
@@ -360,8 +385,14 @@ describe Doorkeeper::TokensController do
 
         post :introspect, params: { token: token_for_introspection.token }
 
-        should_have_json "active", true
-        expect(json_response).to include("client_id", "token_type", "exp", "iat")
+        expect(json_response).to match(
+          "active" => true,
+          "client_id" => client.uid,
+          "token_type" => "Bearer",
+          "scope" => nil,
+          "exp" => an_instance_of(Integer),
+          "iat" => an_instance_of(Integer),
+        )
       end
 
       it "responds with invalid_token error if authorized token doesn't have introspection scope" do
@@ -373,12 +404,15 @@ describe Doorkeeper::TokensController do
 
         response_status_should_be 401
 
-        should_not_have_json "active"
-        should_have_json "error", "invalid_token"
+        expect(json_response).to match(
+          "error" => "invalid_token",
+          "error_description" => an_instance_of(String),
+          "state" => "unauthorized",
+        )
       end
     end
 
-    context "authorized using invalid Bearer token" do
+    context "when authorized using invalid Bearer token" do
       let(:access_token) do
         FactoryBot.create(:access_token, application: client, revoked_at: 1.day.ago)
       end
@@ -390,12 +424,15 @@ describe Doorkeeper::TokensController do
 
         response_status_should_be 401
 
-        should_not_have_json "active"
-        should_have_json "error", "invalid_token"
+        expect(json_response).to match(
+          "error" => "invalid_token",
+          "error_description" => an_instance_of(String),
+          "state" => "unauthorized",
+        )
       end
     end
 
-    context "authorized using the Bearer token that need to be introspected" do
+    context "when authorized using the Bearer token that need to be introspected" do
       it "responds with invalid token error" do
         request.headers["Authorization"] = "Bearer #{access_token.token}"
 
@@ -403,12 +440,15 @@ describe Doorkeeper::TokensController do
 
         response_status_should_be 401
 
-        should_not_have_json "active"
-        should_have_json "error", "invalid_token"
+        expect(json_response).to match(
+          "error" => "invalid_token",
+          "error_description" => an_instance_of(String),
+          "state" => "unauthorized",
+        )
       end
     end
 
-    context "using invalid credentials to authorize" do
+    context "when invalid credentials used to authorize" do
       let(:client) { double(uid: "123123", secret: "666999") }
       let(:access_token) { FactoryBot.create(:access_token) }
 
@@ -420,24 +460,25 @@ describe Doorkeeper::TokensController do
         expect(response).not_to be_successful
         response_status_should_be 401
 
-        should_not_have_json "active"
-        should_have_json "error", "invalid_client"
+        expect(json_response).to match(
+          "error" => "invalid_client",
+          "error_description" => an_instance_of(String),
+        )
       end
     end
 
-    context "using wrong token value" do
-      context "authorized using client credentials" do
+    context "when wrong token value used" do
+      context "when authorized using client credentials" do
         it "responds with only active state" do
           request.headers["Authorization"] = basic_auth_header_for_client(client)
 
           post :introspect, params: { token: SecureRandom.hex(16) }
 
-          should_have_json "active", false
-          expect(json_response).not_to include("client_id", "token_type", "exp", "iat")
+          expect(json_response).to match("active" => false)
         end
       end
 
-      context "authorized using valid Bearer token" do
+      context "when authorized using valid Bearer token" do
         it "responds with invalid_token error" do
           request.headers["Authorization"] = "Bearer #{access_token.token}"
 
@@ -445,8 +486,11 @@ describe Doorkeeper::TokensController do
 
           response_status_should_be 401
 
-          should_not_have_json "active"
-          should_have_json "error", "invalid_token"
+          expect(json_response).to match(
+            "error" => "invalid_token",
+            "error_description" => an_instance_of(String),
+            "state" => "unauthorized",
+          )
         end
       end
     end
@@ -461,8 +505,7 @@ describe Doorkeeper::TokensController do
 
         post :introspect, params: { token: token_for_introspection.token }
 
-        should_have_json "active", false
-        expect(json_response).not_to include("client_id", "token_type", "exp", "iat")
+        expect(json_response).to match("active" => false)
       end
     end
 
@@ -476,12 +519,11 @@ describe Doorkeeper::TokensController do
 
         post :introspect, params: { token: token_for_introspection.token }
 
-        should_have_json "active", false
-        expect(json_response).not_to include("client_id", "token_type", "exp", "iat")
+        expect(json_response).to match("active" => false)
       end
     end
 
-    context "unauthorized (no bearer token or client credentials)" do
+    context "when unauthorized (no bearer token or client credentials)" do
       let(:token_for_introspection) { FactoryBot.create(:access_token) }
 
       it "responds with invalid_request error" do
@@ -490,8 +532,10 @@ describe Doorkeeper::TokensController do
         expect(response).not_to be_successful
         response_status_should_be 400
 
-        should_not_have_json "active"
-        should_have_json "error", "invalid_request"
+        expect(json_response).to match(
+          "error" => "invalid_request",
+          "error_description" => an_instance_of(String),
+        )
       end
     end
   end

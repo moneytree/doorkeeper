@@ -12,9 +12,7 @@ module Doorkeeper
             @scope_str = scope_str
             @valid_scopes = valid_scopes(server_scopes, app_scopes)
 
-            if grant_type
-              @scopes_by_grant_type = Doorkeeper.configuration.scopes_by_grant_type[grant_type.to_sym]
-            end
+            @scopes_by_grant_type = Doorkeeper.config.scopes_by_grant_type[grant_type.to_sym] if grant_type
           end
 
           def valid?
@@ -27,11 +25,7 @@ module Doorkeeper
           private
 
           def valid_scopes(server_scopes, app_scopes)
-            if app_scopes.present?
-              app_scopes
-            else
-              server_scopes
-            end
+            app_scopes.presence || server_scopes
           end
 
           def permitted_to_grant_type?
@@ -43,10 +37,12 @@ module Doorkeeper
         end
 
         def self.valid?(scope_str:, server_scopes:, app_scopes: nil, grant_type: nil)
-          Validator.new(scope_str,
-                        server_scopes,
-                        app_scopes,
-                        grant_type).valid?
+          Validator.new(
+            scope_str,
+            server_scopes,
+            app_scopes,
+            grant_type,
+          ).valid?
         end
       end
     end

@@ -14,7 +14,7 @@ module RequestSpecHelper
   end
 
   def i_should_be_on(path)
-    expect(current_path).to eq(path)
+    expect(page).to have_current_path(path, ignore_query: true)
   end
 
   def url_should_have_param(param, value)
@@ -41,10 +41,6 @@ module RequestSpecHelper
     JSON.parse(request_response.body)
   end
 
-  def should_have_header(header, value)
-    expect(headers[header]).to eq(value)
-  end
-
   def should_have_status(status)
     expect(page.driver.response.status).to eq(status)
   end
@@ -59,18 +55,6 @@ module RequestSpecHelper
 
   def basic_auth_header_for_client(client)
     ActionController::HttpAuthentication::Basic.encode_credentials client.uid, client.secret
-  end
-
-  def should_have_json(key, value)
-    expect(json_response.fetch(key)).to eq(value)
-  end
-
-  def should_have_json_within(key, value, range)
-    expect(json_response.fetch(key)).to be_within(range).of(value)
-  end
-
-  def should_not_have_json(key)
-    expect(json_response).not_to have_key(key)
   end
 
   def sign_in

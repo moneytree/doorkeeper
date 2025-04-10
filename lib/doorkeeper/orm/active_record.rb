@@ -1,52 +1,44 @@
 # frozen_string_literal: true
 
-require "active_support/lazy_load_hooks"
-
 module Doorkeeper
+  autoload :AccessGrant, "doorkeeper/orm/active_record/access_grant"
+  autoload :AccessToken, "doorkeeper/orm/active_record/access_token"
+  autoload :Application, "doorkeeper/orm/active_record/application"
+  autoload :RedirectUriValidator, "doorkeeper/orm/active_record/redirect_uri_validator"
+
+  module Models
+    autoload :Ownership, "doorkeeper/models/concerns/ownership"
+  end
+
+  # ActiveRecord ORM for Doorkeeper entity models.
+  # Consists of three main OAuth entities:
+  #   * Access Token
+  #   * Access Grant
+  #   * Application (client)
+  #
+  # Do a lazy loading of all the required and configured stuff.
+  #
   module Orm
-    # ActiveRecord ORM for Doorkeeper entity models.
-    # Consists of three main OAuth entities:
-    #   * Access Token
-    #   * Access Grant
-    #   * Application (client)
-    #
-    # Do a lazy loading of all the required and configured stuff.
-    #
     module ActiveRecord
-      def self.initialize_models!
-        lazy_load do
-          require "doorkeeper/orm/active_record/stale_records_cleaner"
-          require "doorkeeper/orm/active_record/access_grant"
-          require "doorkeeper/orm/active_record/access_token"
-          require "doorkeeper/orm/active_record/application"
+      autoload :StaleRecordsCleaner, "doorkeeper/orm/active_record/stale_records_cleaner"
 
-          if Doorkeeper.configuration.active_record_options[:establish_connection]
-            Doorkeeper::Orm::ActiveRecord.models.each do |model|
-              options = Doorkeeper.configuration.active_record_options[:establish_connection]
-              model.establish_connection(options)
-            end
-          end
+      module Mixins
+        autoload :AccessGrant, "doorkeeper/orm/active_record/mixins/access_grant"
+        autoload :AccessToken, "doorkeeper/orm/active_record/mixins/access_token"
+        autoload :Application, "doorkeeper/orm/active_record/mixins/application"
+      end
+
+      def self.run_hooks
+        initialize_configured_associations
+      end
+
+      def self.initialize_configured_associations
+        if Doorkeeper.config.enable_application_owner?
+          Doorkeeper.config.application_model.include ::Doorkeeper::Models::Ownership
         end
-      end
 
-      def self.initialize_application_owner!
-        lazy_load do
-          require "doorkeeper/models/concerns/ownership"
-
-          Doorkeeper.configuration.application_model.send :include, Doorkeeper::Models::Ownership
-        end
-      end
-
-      def self.lazy_load(&block)
-        ActiveSupport.on_load(:active_record, {}, &block)
-      end
-
-      def self.models
-        [
-          Doorkeeper.configuration.access_grant_model,
-          Doorkeeper.configuration.access_token_model,
-          Doorkeeper.configuration.application_model,
-        ]
+        Doorkeeper.config.access_grant_model.include ::Doorkeeper::Models::PolymorphicResourceOwner::ForAccessGrant
+        Doorkeeper.config.access_token_model.include ::Doorkeeper::Models::PolymorphicResourceOwner::ForAccessToken
       end
     end
   end

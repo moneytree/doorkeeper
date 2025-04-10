@@ -41,6 +41,11 @@ Doorkeeper.configure do
   #
   # enforce_configured_scopes
 
+  # Use the url path for the native authorization code flow. Enabling this flag sets the authorization
+  # code response route for native redirect uris to oauth/authorize/<code>. The default is oauth/authorize/native?code=<code>.
+  # Rationale: https://github.com/doorkeeper-gem/doorkeeper/issues/1143
+  # use_url_path_for_native_authorization
+
   # Provide support for an owner to be assigned to each registered application (disabled by default)
   # Optional parameter confirmation: true (default false) if you want to enforce ownership of
   # a registered application
@@ -84,8 +89,8 @@ Doorkeeper.configure do
   #
   # implicit and password grant flows have risks that you should understand
   # before enabling:
-  #   http://tools.ietf.org/html/rfc6819#section-4.4.2
-  #   http://tools.ietf.org/html/rfc6819#section-4.4.3
+  #   https://datatracker.ietf.org/doc/html/rfc6819#section-4.4.2
+  #   https://datatracker.ietf.org/doc/html/rfc6819#section-4.4.3
   #
   # grant_flows %w[authorization_code client_credentials]
 

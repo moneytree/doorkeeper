@@ -5,7 +5,7 @@ module Doorkeeper
     before_action :authenticate_resource_owner!
 
     def index
-      @applications = Doorkeeper.configuration.application_model.authorized_for(current_resource_owner)
+      @applications = Doorkeeper.config.application_model.authorized_for(current_resource_owner)
 
       respond_to do |format|
         format.html
@@ -14,19 +14,19 @@ module Doorkeeper
     end
 
     def destroy
-      Doorkeeper.configuration.application_model.revoke_tokens_and_grants_for(
+      Doorkeeper.config.application_model.revoke_tokens_and_grants_for(
         params[:id],
-        current_resource_owner
+        current_resource_owner,
       )
 
       respond_to do |format|
         format.html do
           redirect_to oauth_authorized_applications_url, notice: I18n.t(
-            :notice, scope: %i[doorkeeper flash authorized_applications destroy]
+            :notice, scope: %i[doorkeeper flash authorized_applications destroy],
           )
         end
 
-        format.json { render :no_content }
+        format.json { head :no_content }
       end
     end
   end

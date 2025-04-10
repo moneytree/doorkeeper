@@ -7,10 +7,10 @@ module Doorkeeper
 
       def request
         @request ||= OAuth::AuthorizationCodeRequest.new(
-          Doorkeeper.configuration,
+          Doorkeeper.config,
           grant,
           client,
-          parameters
+          parameters,
         )
       end
 
@@ -19,7 +19,7 @@ module Doorkeeper
       def grant
         raise Errors::MissingRequiredParameter, :code if parameters[:code].blank?
 
-        Doorkeeper.configuration.access_grant_model.by_token(parameters[:code])
+        Doorkeeper.config.access_grant_model.by_token(parameters[:code])
       end
     end
   end

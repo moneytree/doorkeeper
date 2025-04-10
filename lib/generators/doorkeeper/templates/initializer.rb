@@ -29,6 +29,52 @@ Doorkeeper.configure do
   #   end
   # end
 
+  # You can use your own model classes if you need to extend (or even override) default
+  # Doorkeeper models such as `Application`, `AccessToken` and `AccessGrant.
+  #
+  # Be default Doorkeeper ActiveRecord ORM uses it's own classes:
+  #
+  # access_token_class "Doorkeeper::AccessToken"
+  # access_grant_class "Doorkeeper::AccessGrant"
+  # application_class "Doorkeeper::Application"
+  #
+  # Don't forget to include Doorkeeper ORM mixins into your custom models:
+  #
+  #   *  ::Doorkeeper::Orm::ActiveRecord::Mixins::AccessToken - for access token
+  #   *  ::Doorkeeper::Orm::ActiveRecord::Mixins::AccessGrant - for access grant
+  #   *  ::Doorkeeper::Orm::ActiveRecord::Mixins::Application - for application (OAuth2 clients)
+  #
+  # For example:
+  #
+  # access_token_class "MyAccessToken"
+  #
+  # class MyAccessToken < ApplicationRecord
+  #   include ::Doorkeeper::Orm::ActiveRecord::Mixins::AccessToken
+  #
+  #   self.table_name = "hey_i_wanna_my_name"
+  #
+  #   def destroy_me!
+  #     destroy
+  #   end
+  # end
+
+  # Enables polymorphic Resource Owner association for Access Tokens and Access Grants.
+  # By default this option is disabled.
+  #
+  # Make sure you properly setup you database and have all the required columns (run
+  # `bundle exec rails generate doorkeeper:enable_polymorphic_resource_owner` and execute Rails
+  # migrations).
+  #
+  # If this option enabled, Doorkeeper will store not only Resource Owner primary key
+  # value, but also it's type (class name). See "Polymorphic Associations" section of
+  # Rails guides: https://guides.rubyonrails.org/association_basics.html#polymorphic-associations
+  #
+  # [NOTE] If you apply this option on already existing project don't forget to manually
+  # update `resource_owner_type` column in the database and fix migration template as it will
+  # set NOT NULL constraint for Access Grants table.
+  #
+  # use_polymorphic_resource_owner
+
   # If you are planning to use Doorkeeper in Rails 5 API-only application, then you might
   # want to use API mode that will skip all the views management and change the way how
   # Doorkeeper responds to a requests.
@@ -57,12 +103,13 @@ Doorkeeper.configure do
   #
   # `context` has the following properties available:
   #
-  # `client` - the OAuth client application (see Doorkeeper::OAuth::Client)
-  # `grant_type` - the grant type of the request (see Doorkeeper::OAuth)
-  # `scopes` - the requested scopes (see Doorkeeper::OAuth::Scopes)
+  #   * `client` - the OAuth client application (see Doorkeeper::OAuth::Client)
+  #   * `grant_type` - the grant type of the request (see Doorkeeper::OAuth)
+  #   * `scopes` - the requested scopes (see Doorkeeper::OAuth::Scopes)
+  #   * `resource_owner` - authorized resource owner instance (if present)
   #
   # custom_access_token_expires_in do |context|
-  #   context.client.application.additional_settings.implicit_oauth_expiration
+  #   context.client.additional_settings.implicit_oauth_expiration
   # end
 
   # Use a custom class for generating the access token.
@@ -73,15 +120,16 @@ Doorkeeper.configure do
   # The controller +Doorkeeper::ApplicationController+ inherits from.
   # Defaults to +ActionController::Base+ unless +api_only+ is set, which changes the default to
   # +ActionController::API+. The return value of this option must be a stringified class name.
-  # See https://doorkeeper.gitbook.io/guides/configuration/other-configurations#custom-base-controller
+  # See https://doorkeeper.gitbook.io/guides/configuration/other-configurations#custom-controllers
   #
   # base_controller 'ApplicationController'
 
   # Reuse access token for the same resource owner within an application (disabled by default).
   #
-  # This option protects your application from creating new tokens before old valid one becomes
-  # expired so your database doesn't bloat. Keep in mind that when this option is `on` Doorkeeper
-  # doesn't updates existing token expiration time, it will create a new token instead.
+  # This option protects your application from creating new tokens before old **valid** one becomes
+  # expired so your database doesn't bloat. Keep in mind that when this option is enabled Doorkeeper
+  # doesn't update existing token expiration time, it will create a new token instead if no active matching
+  # token found for the application, resources owner and/or set of scopes.
   # Rationale: https://github.com/doorkeeper-gem/doorkeeper/issues/383
   #
   # You can not enable this option together with +hash_token_secrets+.
@@ -106,13 +154,22 @@ Doorkeeper.configure do
   #
   # token_reuse_limit 100
 
+  # Only allow one valid access token obtained via client credentials
+  # per client. If a new access token is obtained before the old one
+  # expired, the old one gets revoked (disabled by default)
+  #
+  # When enabling this option, make sure that you do not expect multiple processes
+  # using the same credentials at the same time (e.g. web servers spanning
+  # multiple machines and/or processes).
+  #
+  # revoke_previous_client_credentials_token
+
   # Hash access and refresh tokens before persisting them.
   # This will disable the possibility to use +reuse_access_token+
   # since plain values can no longer be retrieved.
   #
   # Note: If you are already a user of doorkeeper and have existing tokens
-  # in your installation, they will be invalid without enabling the additional
-  # setting `fallback_to_plain_secrets` below.
+  # in your installation, they will be invalid without adding 'fallback: :plain'.
   #
   # hash_token_secrets
   # By default, token secrets will be hashed using the
@@ -146,7 +203,9 @@ Doorkeeper.configure do
   # This will ensure that old access tokens and secrets
   # will remain valid even if the hashing above is enabled.
   #
-  # fallback_to_plain_secrets
+  # This can be done by adding 'fallback: plain', e.g. :
+  #
+  # hash_application_secrets using: '::Doorkeeper::SecretStoring::BCrypt', fallback: :plain
 
   # Issue access tokens with refresh token (disabled by default), you may also
   # pass a block which accepts `context` to customize when to give a refresh
@@ -218,7 +277,7 @@ Doorkeeper.configure do
   # force_ssl_in_redirect_uri { |uri| uri.host != 'localhost' }
 
   # Specify what redirect URI's you want to block during Application creation.
-  # Any redirect URI is whitelisted by default.
+  # Any redirect URI is allowed by default.
   #
   # You can use this option in order to forbid URI's with 'javascript' scheme
   # for example.
@@ -253,6 +312,12 @@ Doorkeeper.configure do
   #   Doorkeeper::Errors::TokenRevoked, Doorkeeper::Errors::TokenUnknown
   #
   # handle_auth_errors :raise
+  #
+  # If you want to redirect back to the client application in accordance with
+  # https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.2.1, you can set
+  # +handle_auth_errors+ to :redirect
+  #
+  # handle_auth_errors :redirect
 
   # Customize token introspection response.
   # Allows to add your own fields to default one that are required by the OAuth spec
@@ -285,8 +350,8 @@ Doorkeeper.configure do
   #
   # implicit and password grant flows have risks that you should understand
   # before enabling:
-  #   http://tools.ietf.org/html/rfc6819#section-4.4.2
-  #   http://tools.ietf.org/html/rfc6819#section-4.4.3
+  #   https://datatracker.ietf.org/doc/html/rfc6819#section-4.4.2
+  #   https://datatracker.ietf.org/doc/html/rfc6819#section-4.4.3
   #
   # grant_flows %w[authorization_code client_credentials]
 
@@ -321,6 +386,34 @@ Doorkeeper.configure do
   #   client.grant_flows.include?(grant_flow)
   # end
 
+  # If you need arbitrary Resource Owner-Client authorization you can enable this option
+  # and implement the check your need. Config option must respond to #call and return
+  # true in case resource owner authorized for the specific application or false in other
+  # cases.
+  #
+  # By default all Resource Owners are authorized to any Client (application).
+  #
+  # authorize_resource_owner_for_client do |client, resource_owner|
+  #   resource_owner.admin? || client.owners_allowlist.include?(resource_owner)
+  # end
+
+  # Allows additional data fields to be sent while granting access to an application,
+  # and for this additional data to be included in subsequently generated access tokens.
+  # The 'authorizations/new' page will need to be overridden to include this additional data
+  # in the request params when granting access. The access grant and access token models
+  # will both need to respond to these additional data fields, and have a database column
+  # to store them in.
+  #
+  # Example:
+  # You have a multi-tenanted platform and want to be able to grant access to a specific
+  # tenant, rather than all the tenants a user has access to. You can use this config
+  # option to specify that a ':tenant_id' will be passed when authorizing. This tenant_id
+  # will be included in the access tokens. When a request is made with one of these access
+  # tokens, you can check that the requested data belongs to the specified tenant.
+  #
+  # Default value is an empty Array: []
+  # custom_access_token_attributes [:tenant_id]
+
   # Hook into the strategies' request & response life-cycle in case your
   # application needs advanced customization or logging:
   #
@@ -333,17 +426,25 @@ Doorkeeper.configure do
   # end
 
   # Hook into Authorization flow in order to implement Single Sign Out
-  # or add any other functionality.
+  # or add any other functionality. Inside the block you have an access
+  # to `controller` (authorizations controller instance) and `context`
+  # (Doorkeeper::OAuth::Hooks::Context instance) which provides pre auth
+  # or auth objects with issued token based on hook type (before or after).
   #
-  # before_successful_authorization do |controller|
+  # before_successful_authorization do |controller, context|
   #   Rails.logger.info(controller.request.params.inspect)
+  #
+  #   Rails.logger.info(context.pre_auth.inspect)
   # end
   #
-  # after_successful_authorization do |controller|
+  # after_successful_authorization do |controller, context|
   #   controller.session[:logout_urls] <<
   #     Doorkeeper::Application
   #       .find_by(controller.request.params.slice(:redirect_uri))
   #       .logout_uri
+  #
+  #   Rails.logger.info(context.auth.inspect)
+  #   Rails.logger.info(context.issued_token)
   # end
 
   # Under some circumstances you might want to have applications auto-approved,

@@ -2,33 +2,33 @@
 
 require "doorkeeper/rails/routes/mapping"
 require "doorkeeper/rails/routes/mapper"
+require "doorkeeper/rails/routes/abstract_router"
+require "doorkeeper/rails/routes/registry"
 
 module Doorkeeper
   module Rails
     class Routes # :nodoc:
-      mattr_reader :mapping do
-        {}
-      end
-
       module Helper
         def use_doorkeeper(options = {}, &block)
           Doorkeeper::Rails::Routes.new(self, &block).generate_routes!(options)
         end
       end
 
-      def self.install!
-        ActionDispatch::Routing::Mapper.send :include, Doorkeeper::Rails::Routes::Helper
+      include AbstractRouter
+      extend Registry
+
+      mattr_reader :mapping do
+        {}
       end
 
-      attr_reader :routes
+      def self.install!
+        ActionDispatch::Routing::Mapper.include Doorkeeper::Rails::Routes::Helper
 
-      def initialize(routes, &block)
-        @routes = routes
-        @mapping = Mapper.new.map(&block)
+        registered_routes.each(&:install!)
+      end
 
-        if Doorkeeper.configuration.api_only
-          @mapping.skips.push(:applications, :authorized_applications)
-        end
+      def initialize(routes, mapper = Mapper.new, &block)
+        super
       end
 
       def generate_routes!(options)
@@ -36,7 +36,7 @@ module Doorkeeper
           map_route(:authorizations, :authorization_routes)
           map_route(:tokens, :token_routes)
           map_route(:tokens, :revoke_routes)
-          map_route(:tokens, :introspect_routes)
+          map_route(:tokens, :introspect_routes) if introspection_routes?
           map_route(:applications, :application_routes)
           map_route(:authorized_applications, :authorized_applications_routes)
           map_route(:token_info, :token_info_routes)
@@ -45,21 +45,13 @@ module Doorkeeper
 
       private
 
-      def map_route(name, method)
-        return if @mapping.skipped?(name)
-
-        send(method, @mapping[name])
-
-        mapping[name] = @mapping[name]
-      end
-
       def authorization_routes(mapping)
         routes.resource(
           :authorization,
           path: "authorize",
           only: %i[create destroy],
           as: mapping[:as],
-          controller: mapping[:controllers]
+          controller: mapping[:controllers],
         ) do
           routes.get native_authorization_code_route, action: :show, on: :member
           routes.get '/', action: :new, on: :member
@@ -71,7 +63,7 @@ module Doorkeeper
           :token,
           path: "token",
           only: [:create], as: mapping[:as],
-          controller: mapping[:controllers]
+          controller: mapping[:controllers],
         )
       end
 
@@ -88,7 +80,7 @@ module Doorkeeper
           :token_info,
           path: "token/info",
           only: [:show], as: mapping[:as],
-          controller: mapping[:controllers]
+          controller: mapping[:controllers],
         )
       end
 
@@ -107,6 +99,11 @@ module Doorkeeper
 
       def native_authorization_code_route
         Doorkeeper.configuration.native_authorization_code_route
+      end
+
+      def introspection_routes?
+        Doorkeeper.configured? &&
+          !Doorkeeper.config.allow_token_introspection.is_a?(FalseClass)
       end
     end
   end

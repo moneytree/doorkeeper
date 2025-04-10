@@ -4,11 +4,8 @@ module Doorkeeper
   module OAuth
     # RFC7662 OAuth 2.0 Token Introspection
     #
-    # @see https://tools.ietf.org/html/rfc7662
+    # @see https://datatracker.ietf.org/doc/html/rfc7662
     class TokenIntrospection
-      attr_reader :server, :token
-      attr_reader :error, :invalid_request_reason
-
       def initialize(server, token)
         @server = server
         @token = token
@@ -37,6 +34,9 @@ module Doorkeeper
       end
 
       private
+
+      attr_reader :server, :token
+      attr_reader :error, :invalid_request_reason
 
       # If the protected resource uses OAuth 2.0 client credentials to
       # authenticate to the introspection endpoint and its credentials are
@@ -94,7 +94,7 @@ module Doorkeeper
           client_id: @token.try(:application).try(:uid),
           token_type: @token.token_type,
           exp: @token.expires_at.to_i,
-          iat: @token.created_at.to_i
+          iat: @token.created_at.to_i,
         )
       end
 
@@ -107,7 +107,7 @@ module Doorkeeper
       # authorization server SHOULD NOT include any additional information
       # about an inactive token, including why the token is inactive.
       #
-      # @see https://tools.ietf.org/html/rfc7662 2.2. Introspection Response
+      # @see https://datatracker.ietf.org/doc/html/rfc7662 2.2. Introspection Response
       #
       def failure_response
         {
@@ -134,7 +134,7 @@ module Doorkeeper
       # Since resource servers using token introspection rely on the
       # authorization server to determine the state of a token, the
       # authorization server MUST perform all applicable checks against a
-      # token's state.  For instance, these tests include the following:
+      # token's state. For instance, these tests include the following:
       #
       #    o  If the token can expire, the authorization server MUST determine
       #       whether or not the token has expired.
@@ -174,28 +174,24 @@ module Doorkeeper
         authorized_token.token == @token&.token
       end
 
-      # config constraints for introspection in Doorkeeper.configuration.allow_token_introspection
+      # Config constraints for introspection in Doorkeeper.config.allow_token_introspection
       def token_introspection_allowed?(auth_client: nil, auth_token: nil)
-        allow_introspection = Doorkeeper.configuration.allow_token_introspection
+        allow_introspection = Doorkeeper.config.allow_token_introspection
         return allow_introspection unless allow_introspection.respond_to?(:call)
 
-        allow_introspection.call(
-          @token,
-          auth_client,
-          auth_token
-        )
+        allow_introspection.call(@token, auth_client, auth_token)
       end
 
       # Allows to customize introspection response.
       # Provides context (controller) and token for generating developer-specific
       # response.
       #
-      # @see https://tools.ietf.org/html/rfc7662#section-2.2
+      # @see https://datatracker.ietf.org/doc/html/rfc7662#section-2.2
       #
       def customize_response(response)
-        customized_response = Doorkeeper.configuration.custom_introspection_response.call(
+        customized_response = Doorkeeper.config.custom_introspection_response.call(
           token,
-          server.context
+          server.context,
         )
         return response if customized_response.blank?
 

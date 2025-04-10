@@ -6,9 +6,9 @@ module Doorkeeper
       attr_reader :reason
 
       def self.from_access_token(access_token, attributes = {})
-        reason = if access_token.try(:revoked?)
+        reason = if access_token&.revoked?
                    :revoked
-                 elsif access_token.try(:expired?)
+                 elsif access_token&.expired?
                    :expired
                  else
                    :unknown
@@ -27,8 +27,11 @@ module Doorkeeper
       end
 
       def description
-        scope = { scope: %i[doorkeeper errors messages invalid_token] }
-        @description ||= I18n.translate @reason, scope
+        @description ||=
+          I18n.translate(
+            @reason,
+            scope: %i[doorkeeper errors messages invalid_token],
+          )
       end
 
       protected

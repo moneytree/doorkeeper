@@ -2,74 +2,74 @@
 
 require "spec_helper"
 
-module Doorkeeper::OAuth
-  describe InvalidRequestResponse do
-    describe "#name" do
-      it { expect(subject.name).to eq(:invalid_request) }
+RSpec.describe Doorkeeper::OAuth::InvalidRequestResponse do
+  subject(:response) { described_class.new }
+
+  describe "#name" do
+    it { expect(response.name).to eq(:invalid_request) }
+  end
+
+  describe "#status" do
+    it { expect(response.status).to eq(:bad_request) }
+  end
+
+  describe ".from_request" do
+    let(:response) { described_class.from_request(request) }
+
+    context "when param missed" do
+      let(:request) { double(missing_param: "some_param") }
+
+      it "sets a description" do
+        expect(response.description).to eq(
+          I18n.t(:missing_param, scope: %i[doorkeeper errors messages invalid_request], value: "some_param"),
+        )
+      end
+
+      it "sets the reason" do
+        expect(response.reason).to eq(:missing_param)
+      end
     end
 
-    describe "#status" do
-      it { expect(subject.status).to eq(:bad_request) }
+    context "when request is not authorized" do
+      let(:request) { double(invalid_request_reason: :request_not_authorized) }
+
+      it "sets a description" do
+        expect(response.description).to eq(
+          I18n.t(:request_not_authorized, scope: %i[doorkeeper errors messages invalid_request]),
+        )
+      end
+
+      it "sets the reason" do
+        expect(response.reason).to eq(:request_not_authorized)
+      end
     end
 
-    describe :from_request do
-      let(:response) { InvalidRequestResponse.from_request(request) }
+    context "when unknown reason" do
+      let(:request) { double(invalid_request_reason: :unknown_reason) }
 
-      context "missing param" do
-        let(:request) { double(missing_param: "some_param") }
-
-        it "sets a description" do
-          expect(response.description).to eq(
-            I18n.t(:missing_param, scope: %i[doorkeeper errors messages invalid_request], value: "some_param")
-          )
-        end
-
-        it "sets the reason" do
-          expect(response.reason).to eq(:missing_param)
-        end
+      it "sets a description" do
+        expect(response.description).to eq(
+          I18n.t(:unknown, scope: %i[doorkeeper errors messages invalid_request]),
+        )
       end
 
-      context "server doesn not support_pkce" do
-        let(:request) { double(invalid_request_reason: :not_support_pkce) }
-
-        it "sets a description" do
-          expect(response.description).to eq(
-            I18n.t(:not_support_pkce, scope: %i[doorkeeper errors messages invalid_request])
-          )
-        end
-
-        it "sets the reason" do
-          expect(response.reason).to eq(:not_support_pkce)
-        end
+      it "sets the reason to unknown" do
+        expect(response.reason).to eq(:unknown_reason)
       end
+    end
+  end
 
-      context "request is not authorized" do
-        let(:request) { double(invalid_request_reason: :request_not_authorized) }
+  describe ".redirectable?" do
+    it "not redirectable when missing_param is client_id" do
+      subject = described_class.new(missing_param: :client_id)
 
-        it "sets a description" do
-          expect(response.description).to eq(
-            I18n.t(:request_not_authorized, scope: %i[doorkeeper errors messages invalid_request])
-          )
-        end
+      expect(subject.redirectable?).to be false
+    end
 
-        it "sets the reason" do
-          expect(response.reason).to eq(:request_not_authorized)
-        end
-      end
+    it "is redirectable when missing_param is other than client_id" do
+      subject = described_class.new(missing_param: :code_verifier)
 
-      context "unknown reason" do
-        let(:request) { double(invalid_request_reason: :unknown_reason) }
-
-        it "sets a description" do
-          expect(response.description).to eq(
-            I18n.t(:unknown, scope: %i[doorkeeper errors messages invalid_request])
-          )
-        end
-
-        it "unknown reason" do
-          expect(response.reason).to eq(:unknown_reason)
-        end
-      end
+      expect(subject.redirectable?).to be true
     end
   end
 end

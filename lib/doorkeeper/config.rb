@@ -1,60 +1,18 @@
 # frozen_string_literal: true
 
+require "doorkeeper/config/abstract_builder"
 require "doorkeeper/config/option"
+require "doorkeeper/config/validations"
 
 module Doorkeeper
-  class MissingConfiguration < StandardError
-    # Defines a MissingConfiguration error for a missing Doorkeeper
-    # configuration
-    def initialize
-      super("Configuration for doorkeeper missing. Do you have doorkeeper initializer?")
-    end
-  end
-
-  def self.configure(&block)
-    @config = Config::Builder.new(&block).build
-    setup_orm_adapter
-    setup_orm_models
-    setup_application_owner if @config.enable_application_owner?
-    @config
-  end
-
-  def self.configuration
-    @config || (raise MissingConfiguration)
-  end
-
-  def self.setup_orm_adapter
-    @orm_adapter = "doorkeeper/orm/#{configuration.orm}".classify.constantize
-  rescue NameError => e
-    raise e, "ORM adapter not found (#{configuration.orm})", <<-ERROR_MSG.strip_heredoc
-      [doorkeeper] ORM adapter not found (#{configuration.orm}), or there was an error
-      trying to load it.
-
-      You probably need to add the related gem for this adapter to work with
-      doorkeeper.
-    ERROR_MSG
-  end
-
-  def self.setup_orm_models
-    @orm_adapter.initialize_models!
-  end
-
-  def self.setup_application_owner
-    @orm_adapter.initialize_application_owner!
-  end
-
+  # Doorkeeper option DSL could be reused in extensions to build their own
+  # configurations. To use the Option DSL gems need to define `builder_class` method
+  # that returns configuration Builder class. This exception raises when they don't
+  # define it.
+  #
   class Config
-    class Builder
-      def initialize(&block)
-        @config = Config.new
-        instance_eval(&block)
-      end
-
-      def build
-        @config.validate
-        @config
-      end
-
+    # Default Doorkeeper configuration builder
+    class Builder < AbstractBuilder
       # Provide support for an owner to be assigned to each registered
       # application (disabled by default)
       # Optional parameter confirmation: true (default false) if you want
@@ -120,7 +78,7 @@ module Doorkeeper
       def use_refresh_token(enabled = true, &block)
         @config.instance_variable_set(
           :@refresh_token_enabled,
-          block || enabled
+          block || enabled,
         )
       end
 
@@ -131,19 +89,33 @@ module Doorkeeper
         @config.instance_variable_set(:@reuse_access_token, true)
       end
 
-      # Sets the token_reuse_limit
-      # It will be used only when reuse_access_token option in enabled
-      # By default it will be 100
-      # It will be used for token reusablity to some threshold percentage
-      # Rationale: https://github.com/doorkeeper-gem/doorkeeper/issues/1189
-      def token_reuse_limit(percentage)
-        @config.instance_variable_set(:@token_reuse_limit, percentage)
+      # Choose to use the url path for native autorization codes 
+      # Enabling this flag sets the authorization code response route for
+      # native redirect uris to oauth/authorize/<code>. The default is
+      # oauth/authorize/native?code=<code>.
+      # Rationale: https://github.com/doorkeeper-gem/doorkeeper/issues/1143
+      def use_url_path_for_native_authorization
+        @config.instance_variable_set(:@use_url_path_for_native_authorization, true)
+      end
+
+      # TODO: maybe make it more generic for other flows too?
+      # Only allow one valid access token obtained via client credentials
+      # per client. If a new access token is obtained before the old one
+      # expired, the old one gets revoked (disabled by default)
+      def revoke_previous_client_credentials_token
+        @config.instance_variable_set(:@revoke_previous_client_credentials_token, true)
       end
 
       # Use an API mode for applications generated with --api argument
       # It will skip applications controller, disable forgery protection
       def api_only
         @config.instance_variable_set(:@api_only, true)
+      end
+
+      # Enables polymorphic Resource Owner association for Access Grant and
+      # Access Token models. Requires additional database columns to be setup.
+      def use_polymorphic_resource_owner
+        @config.instance_variable_set(:@polymorphic_resource_owner, true)
       end
 
       # Forbids creating/updating applications with arbitrary scopes that are
@@ -195,8 +167,7 @@ module Doorkeeper
       def configure_secrets_for(type, using:, fallback:)
         raise ArgumentError, "Invalid type #{type}" if %i[application token].exclude?(type)
 
-        @config.instance_variable_set(:"@#{type}_secret_strategy",
-                                      using.constantize)
+        @config.instance_variable_set(:"@#{type}_secret_strategy", using.constantize)
 
         if fallback.nil?
           return
@@ -204,18 +175,21 @@ module Doorkeeper
           fallback = "::Doorkeeper::SecretStoring::Plain"
         end
 
-        @config.instance_variable_set(:"@#{type}_secret_fallback_strategy",
-                                      fallback.constantize)
+        @config.instance_variable_set(:"@#{type}_secret_fallback_strategy", fallback.constantize)
       end
     end
 
+    # Replace with `default: Builder` when we drop support of Rails < 5.2
+    mattr_reader(:builder_class) { Builder }
+
     extend Option
+    include Validations
 
     option :resource_owner_authenticator,
            as: :authenticate_resource_owner,
            default: (lambda do |_routes|
              ::Rails.logger.warn(
-               I18n.t("doorkeeper.errors.messages.resource_owner_authenticator_not_configured")
+               I18n.t("doorkeeper.errors.messages.resource_owner_authenticator_not_configured"),
              )
 
              nil
@@ -225,7 +199,7 @@ module Doorkeeper
            as: :authenticate_admin,
            default: (lambda do |_routes|
              ::Rails.logger.warn(
-               I18n.t("doorkeeper.errors.messages.admin_authenticator_not_configured")
+               I18n.t("doorkeeper.errors.messages.admin_authenticator_not_configured"),
              )
 
              head :forbidden
@@ -234,15 +208,15 @@ module Doorkeeper
     option :resource_owner_from_credentials,
            default: (lambda do |_routes|
              ::Rails.logger.warn(
-               I18n.t("doorkeeper.errors.messages.credential_flow_not_configured")
+               I18n.t("doorkeeper.errors.messages.credential_flow_not_configured"),
              )
 
              nil
            end)
 
     # Hooks for authorization
-    option :before_successful_authorization,      default: ->(_context) {}
-    option :after_successful_authorization,       default: ->(_context) {}
+    option :before_successful_authorization,      default: ->(_controller, _context = nil) {}
+    option :after_successful_authorization,       default: ->(_controller, _context = nil) {}
     # Hooks for strategies responses
     option :before_successful_strategy_response,  default: ->(_request) {}
     option :after_successful_strategy_response,   default: ->(_request, _response) {}
@@ -255,10 +229,34 @@ module Doorkeeper
     option :authorization_code_expires_in,  default: 600
     option :orm,                            default: :active_record
     option :native_redirect_uri,            default: "urn:ietf:wg:oauth:2.0:oob", deprecated: true
-    option :active_record_options,          default: {}
     option :grant_flows,                    default: %w[authorization_code client_credentials]
     option :handle_auth_errors,             default: :render
     option :token_lookup_batch_size,        default: 10_000
+    # Sets the token_reuse_limit
+    # It will be used only when reuse_access_token option in enabled
+    # By default it will be 100
+    # It will be used for token reusablity to some threshold percentage
+    # Rationale: https://github.com/doorkeeper-gem/doorkeeper/issues/1189
+    option :token_reuse_limit,              default: 100
+
+    # Don't require client authentication for password grants. If client credentials
+    # are present they will still be validated, and the grant rejected if the credentials
+    # are invalid.
+    #
+    # This is discouraged. Spec says that password grants always require a client.
+    #
+    # See https://github.com/doorkeeper-gem/doorkeeper/issues/1412#issuecomment-632750422
+    # and https://github.com/doorkeeper-gem/doorkeeper/pull/1420
+    #
+    # Since many applications use this unsafe behavior in the wild, this is kept as a
+    # not-recommended option. You should be aware that you are not following the OAuth
+    # spec, and understand the security implications of doing so.
+    option :skip_client_authentication_for_password_grant,
+           default: false
+
+    # Hook to allow arbitrary user-client authorization
+    option :authorize_resource_owner_for_client,
+           default: ->(_client, _resource_owner) { true }
 
     # Allows to customize OAuth grant flows that +each+ application support.
     # You can configure a custom block (or use a class respond to `#call`) that must
@@ -323,17 +321,35 @@ module Doorkeeper
     option :access_token_generator,
            default: "Doorkeeper::OAuth::Helpers::UniqueToken"
 
+    # Allows additional data to be received when granting access to an Application, and for this
+    # additional data to be sent with subsequently generated access tokens. The access grant and
+    # access token models will both need to respond to the specified attribute names.
+    #
+    # @param attributes [Array] The array of custom attribute names to be saved
+    #
+    option :custom_access_token_attributes,
+           default: []
+
+    # Use a custom class for generating the application secret.
+    # https://doorkeeper.gitbook.io/guides/configuration/other-configurations#custom-application-secret-generator
+    #
+    # @param application_secret_generator [String]
+    #   the name of the application secret generator class
+    #
+    option :application_secret_generator,
+           default: "Doorkeeper::OAuth::Helpers::UniqueToken"
+
     # Default access token generator is a SecureRandom class from Ruby stdlib.
     # This option defines which method will be used to generate a unique token value.
     #
-    # @param access_token_generator [String]
-    #   the name of the access token generator class
+    # @param default_generator_method [Symbol]
+    #   the method name of the default access token generator
     #
     option :default_generator_method, default: :urlsafe_base64
 
     # The controller Doorkeeper::ApplicationController inherits from.
     # Defaults to ActionController::Base.
-    # https://doorkeeper.gitbook.io/guides/configuration/other-configurations#custom-base-controller
+    # https://doorkeeper.gitbook.io/guides/configuration/other-configurations#custom-controllers
     #
     # @param base_controller [String] the name of the base controller
     option :base_controller,
@@ -350,11 +366,13 @@ module Doorkeeper
 
     option :access_token_class,
            default: "Doorkeeper::AccessToken"
+
     option :access_grant_class,
            default: "Doorkeeper::AccessGrant"
+
     option :application_class,
            default: "Doorkeeper::Application"
-    
+
     # Allows to set blank redirect URIs for Applications in case
     # server configured to use URI-less grant flows.
     #
@@ -394,17 +412,42 @@ module Doorkeeper
              end
            end)
 
-    attr_reader :api_only,
-                :enforce_content_type,
-                :reuse_access_token,
+    attr_reader :reuse_access_token,
                 :token_secret_fallback_strategy,
                 :application_secret_fallback_strategy
 
-    # Return the valid subset of this configuration
-    def validate
-      validate_reuse_access_token_value
-      validate_token_reuse_limit
-      validate_secret_strategies
+    def clear_cache!
+      %i[
+        application_model
+        access_token_model
+        access_grant_model
+      ].each do |var|
+        remove_instance_variable("@#{var}") if instance_variable_defined?("@#{var}")
+      end
+    end
+
+    # Doorkeeper Access Token model class.
+    #
+    # @return [ActiveRecord::Base, Mongoid::Document, Sequel::Model]
+    #
+    def access_token_model
+      @access_token_model ||= access_token_class.constantize
+    end
+
+    # Doorkeeper Access Grant model class.
+    #
+    # @return [ActiveRecord::Base, Mongoid::Document, Sequel::Model]
+    #
+    def access_grant_model
+      @access_grant_model ||= access_grant_class.constantize
+    end
+
+    # Doorkeeper Application model class.
+    #
+    # @return [ActiveRecord::Base, Mongoid::Document, Sequel::Model]
+    #
+    def application_model
+      @application_model ||= application_class.constantize
     end
 
     def api_only
@@ -415,28 +458,12 @@ module Doorkeeper
       @enforce_content_type ||= false
     end
 
-    def access_token_model
-      @access_token_model ||= Doorkeeper.configuration.access_token_class.constantize
-    end
-
-    def access_grant_model
-      @access_grant_model ||= Doorkeeper.configuration.access_grant_class.constantize
-    end
-
-    def application_model
-      @application_model ||= Doorkeeper.configuration.application_class.constantize
-    end
-
     def refresh_token_enabled?
       if defined?(@refresh_token_enabled)
         @refresh_token_enabled
       else
         false
       end
-    end
-
-    def token_reuse_limit
-      @token_reuse_limit ||= 100
     end
 
     def resolve_controller(name)
@@ -450,6 +477,10 @@ module Doorkeeper
       controller_name.constantize
     end
 
+    def revoke_previous_client_credentials_token?
+      option_set? :revoke_previous_client_credentials_token
+    end
+
     def enforce_configured_scopes?
       option_set? :enforce_configured_scopes
     end
@@ -458,12 +489,24 @@ module Doorkeeper
       option_set? :enable_application_owner
     end
 
+    def polymorphic_resource_owner?
+      option_set? :polymorphic_resource_owner
+    end
+
     def confirm_application_owner?
       option_set? :confirm_application_owner
     end
 
     def raise_on_errors?
       handle_auth_errors == :raise
+    end
+
+    def redirect_on_errors?
+      handle_auth_errors == :redirect
+    end
+
+    def application_secret_hashed?
+      instance_variable_defined?(:"@application_secret_strategy")
     end
 
     def token_secret_strategy
@@ -502,12 +545,82 @@ module Doorkeeper
       ]
     end
 
+    def enabled_grant_flows
+      @enabled_grant_flows ||= calculate_grant_flows.map { |name| Doorkeeper::GrantFlow.get(name) }.compact
+    end
+
+    def authorization_response_flows
+      @authorization_response_flows ||= enabled_grant_flows.select(&:handles_response_type?) +
+                                        deprecated_authorization_flows
+    end
+
+    def token_grant_flows
+      @token_grant_flows ||= calculate_token_grant_flows
+    end
+
     def authorization_response_types
-      @authorization_response_types ||= calculate_authorization_response_types.freeze
+      authorization_response_flows.map(&:response_type_matches)
     end
 
     def token_grant_types
-      @token_grant_types ||= calculate_token_grant_types.freeze
+      token_grant_flows.map(&:grant_type_matches)
+    end
+
+    # [NOTE]: deprecated and will be removed soon
+    def deprecated_token_grant_types_resolver
+      @deprecated_token_grant_types ||= calculate_token_grant_types
+    end
+    
+    def native_authorization_code_route
+      @use_url_path_for_native_authorization = false unless defined?(@use_url_path_for_native_authorization)
+      @use_url_path_for_native_authorization ? '/:code' : '/native'
+    end
+
+    # [NOTE]: deprecated and will be removed soon
+    def deprecated_authorization_flows
+      response_types = calculate_authorization_response_types
+
+      if response_types.any?
+        ::Kernel.warn <<~WARNING
+          Please, don't patch Doorkeeper::Config#calculate_authorization_response_types method.
+          Register your custom grant flows using the public API:
+          `Doorkeeper::GrantFlow.register(grant_flow_name, **options)`.
+        WARNING
+      end
+
+      response_types.map do |response_type|
+        Doorkeeper::GrantFlow::FallbackFlow.new(response_type, response_type_matches: response_type)
+      end
+    end
+
+    # [NOTE]: deprecated and will be removed soon
+    def calculate_authorization_response_types
+      []
+    end
+
+    # [NOTE]: deprecated and will be removed soon
+    def calculate_token_grant_types
+      types = grant_flows - ["implicit"]
+      types << "refresh_token" if refresh_token_enabled?
+      types
+    end
+
+    # Calculates grant flows configured by the user in Doorkeeper
+    # configuration considering registered aliases that is exposed
+    # to single or multiple other flows.
+    #
+    def calculate_grant_flows
+      configured_flows = grant_flows.map(&:to_s)
+      aliases = Doorkeeper::GrantFlow.aliases.keys.map(&:to_s)
+
+      flows = configured_flows - aliases
+      aliases.each do |flow_alias|
+        next unless configured_flows.include?(flow_alias)
+
+        flows.concat(Doorkeeper::GrantFlow.expand_alias(flow_alias))
+      end
+
+      flows.flatten.uniq
     end
 
     def native_authorization_code_route
@@ -541,57 +654,10 @@ module Doorkeeper
       !!(defined?(var) && var)
     end
 
-    # Determines what values are acceptable for 'response_type' param in
-    # authorization request endpoint, and return them as an array of strings.
-    #
-    def calculate_authorization_response_types
-      types = []
-      types << "code"  if grant_flows.include? "authorization_code"
-      types << "token" if grant_flows.include? "implicit"
-      types
-    end
-
-    # Determines what values are acceptable for 'grant_type' param token
-    # request endpoint, and return them in array.
-    #
-    def calculate_token_grant_types
-      types = grant_flows - ["implicit"]
-      types << "refresh_token" if refresh_token_enabled?
-      types
-    end
-
-    # Determine whether +reuse_access_token+ and a non-restorable
-    # +token_secret_strategy+ have both been activated.
-    #
-    # In that case, disable reuse_access_token value and warn the user.
-    def validate_reuse_access_token_value
-      strategy = token_secret_strategy
-      return if !reuse_access_token || strategy.allows_restoring_secrets?
-
-      ::Rails.logger.warn(
-        "You have configured both reuse_access_token " \
-        "AND strategy strategy '#{strategy}' that cannot restore tokens. " \
-        "This combination is unsupported. reuse_access_token will be disabled"
-      )
-      @reuse_access_token = false
-    end
-
-    # Validate that the provided strategies are valid for
-    # tokens and applications
-    def validate_secret_strategies
-      token_secret_strategy.validate_for :token
-      application_secret_strategy.validate_for :application
-    end
-
-    def validate_token_reuse_limit
-      return if !reuse_access_token ||
-                (token_reuse_limit > 0 && token_reuse_limit <= 100)
-
-      ::Rails.logger.warn(
-        "You have configured an invalid value for token_reuse_limit option. " \
-        "It will be set to default 100"
-      )
-      @token_reuse_limit = 100
+    def calculate_token_grant_flows
+      flows = enabled_grant_flows.select(&:handles_grant_type?)
+      flows << Doorkeeper::GrantFlow.get("refresh_token") if refresh_token_enabled?
+      flows
     end
   end
 end

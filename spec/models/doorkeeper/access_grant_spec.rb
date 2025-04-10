@@ -2,13 +2,20 @@
 
 require "spec_helper"
 
-describe Doorkeeper::AccessGrant do
+RSpec.describe Doorkeeper::AccessGrant do
+  subject(:access_grant) do
+    FactoryBot.build(
+      :access_grant,
+      application: client,
+      resource_owner_id: resource_owner.id,
+      resource_owner_type: resource_owner.class.name,
+    )
+  end
+
+  let(:resource_owner) { FactoryBot.build_stubbed(:resource_owner) }
   let(:client) { FactoryBot.build_stubbed(:application) }
-  let(:clazz) { Doorkeeper::AccessGrant }
 
-  subject { FactoryBot.build(:access_grant, application: client) }
-
-  it { expect(subject).to be_valid }
+  it { expect(access_grant).to be_valid }
 
   it_behaves_like "an accessible token"
   it_behaves_like "a revocable token"
@@ -17,7 +24,12 @@ describe Doorkeeper::AccessGrant do
   end
 
   context "with hashing enabled" do
-    let(:grant) { FactoryBot.create :access_grant }
+    let(:grant) do
+      FactoryBot.create :access_grant,
+                        resource_owner_id: resource_owner.id,
+                        resource_owner_type: resource_owner.class.name
+    end
+
     include_context "with token hashing enabled"
 
     it "holds a volatile plaintext token when created" do
@@ -26,14 +38,14 @@ describe Doorkeeper::AccessGrant do
         .to eq(hashed_or_plain_token_func.call(grant.plaintext_token))
 
       # Finder method only finds the hashed token
-      loaded = clazz.find_by(token: grant.token)
+      loaded = described_class.find_by(token: grant.token)
       expect(loaded).to eq(grant)
       expect(loaded.plaintext_token).to be_nil
       expect(loaded.token).to eq(grant.token)
     end
 
     it "does not find_by plain text tokens" do
-      expect(clazz.find_by(token: grant.plaintext_token)).to be_nil
+      expect(described_class.find_by(token: grant.plaintext_token)).to be_nil
     end
 
     describe "with having a plain text token" do
@@ -46,8 +58,8 @@ describe Doorkeeper::AccessGrant do
 
       context "without fallback lookup" do
         it "does not provide lookups with either through by_token" do
-          expect(clazz.by_token(plain_text_token)).to eq(nil)
-          expect(clazz.by_token(grant.token)).to eq(nil)
+          expect(described_class.by_token(plain_text_token)).to eq(nil)
+          expect(described_class.by_token(grant.token)).to eq(nil)
 
           # And it does not touch the token
           grant.reload
@@ -60,8 +72,8 @@ describe Doorkeeper::AccessGrant do
 
         it "upgrades a plain token when falling back to it" do
           # Side-effect: This will automatically upgrade the token
-          expect(clazz).to receive(:upgrade_fallback_value).and_call_original
-          expect(clazz.by_token(plain_text_token))
+          expect(described_class).to receive(:upgrade_fallback_value).and_call_original
+          expect(described_class.by_token(plain_text_token))
             .to have_attributes(
               resource_owner_id: grant.resource_owner_id,
               application_id: grant.application_id,
@@ -71,7 +83,7 @@ describe Doorkeeper::AccessGrant do
             )
 
           # Will find subsequently by hashing the token
-          expect(clazz.by_token(plain_text_token))
+          expect(described_class.by_token(plain_text_token))
             .to have_attributes(
               resource_owner_id: grant.resource_owner_id,
               application_id: grant.application_id,
@@ -82,14 +94,14 @@ describe Doorkeeper::AccessGrant do
 
           # Not all the ORM support :id PK
           if grant.respond_to?(:id)
-            expect(clazz.by_token(plain_text_token).id).to eq(grant.id)
+            expect(described_class.by_token(plain_text_token).id).to eq(grant.id)
           end
 
           # And it modifies the token value
           grant.reload
           expect(grant.token).not_to eq(plain_text_token)
-          expect(clazz.find_by(token: plain_text_token)).to eq(nil)
-          expect(clazz.find_by(token: grant.token)).not_to be_nil
+          expect(described_class.find_by(token: plain_text_token)).to eq(nil)
+          expect(described_class.find_by(token: grant.token)).not_to be_nil
         end
       end
     end
@@ -97,34 +109,34 @@ describe Doorkeeper::AccessGrant do
 
   describe "validations" do
     it "is invalid without resource_owner_id" do
-      subject.resource_owner_id = nil
-      expect(subject).not_to be_valid
+      access_grant.resource_owner_id = nil
+      expect(access_grant).not_to be_valid
     end
 
     it "is invalid without application_id" do
-      subject.application_id = nil
-      expect(subject).not_to be_valid
+      access_grant.application_id = nil
+      expect(access_grant).not_to be_valid
     end
 
     it "is invalid without token" do
-      subject.save
-      subject.token = nil
-      expect(subject).not_to be_valid
+      access_grant.save
+      access_grant.token = nil
+      expect(access_grant).not_to be_valid
     end
 
     it "is invalid without expires_in" do
-      subject.expires_in = nil
-      expect(subject).not_to be_valid
+      access_grant.expires_in = nil
+      expect(access_grant).not_to be_valid
     end
   end
 
   describe ".revoke_all_for" do
-    let(:resource_owner) { double(id: 100) }
     let(:application) { FactoryBot.create :application }
     let(:default_attributes) do
       {
         application: application,
         resource_owner_id: resource_owner.id,
+        resource_owner_type: resource_owner.class.name,
       }
     end
 
@@ -132,16 +144,13 @@ describe Doorkeeper::AccessGrant do
       FactoryBot.create :access_grant, default_attributes
 
       described_class.revoke_all_for(application.id, resource_owner)
-
-      described_class.all.each do |token|
-        expect(token).to be_revoked
-      end
+      expect(described_class.all).to all(be_revoked)
     end
 
     it "matches application" do
       access_grant_for_different_app = FactoryBot.create(
         :access_grant,
-        default_attributes.merge(application: FactoryBot.create(:application))
+        default_attributes.merge(application: FactoryBot.create(:application)),
       )
 
       described_class.revoke_all_for(application.id, resource_owner)
@@ -150,12 +159,13 @@ describe Doorkeeper::AccessGrant do
     end
 
     it "matches resource owner" do
+      other_resource_owner = FactoryBot.create(:resource_owner)
       access_grant_for_different_owner = FactoryBot.create(
         :access_grant,
-        default_attributes.merge(resource_owner_id: 90)
+        default_attributes.merge(resource_owner_id: other_resource_owner.id),
       )
 
-      described_class.revoke_all_for application.id, resource_owner
+      described_class.revoke_all_for(application.id, resource_owner)
 
       expect(access_grant_for_different_owner.reload).not_to be_revoked
     end

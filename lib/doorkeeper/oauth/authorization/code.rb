@@ -4,35 +4,54 @@ module Doorkeeper
   module OAuth
     module Authorization
       class Code
-        attr_accessor :pre_auth, :resource_owner, :token
+        attr_reader :pre_auth, :resource_owner, :token
 
         def initialize(pre_auth, resource_owner)
           @pre_auth = pre_auth
           @resource_owner = resource_owner
         end
 
-        def issue_token
-          @token ||= Doorkeeper.configuration.access_grant_model.create! access_grant_attributes
+        def issue_token!
+          return @token if defined?(@token)
+
+          @token = Doorkeeper.config.access_grant_model.create!(access_grant_attributes)
         end
 
         def oob_redirect
           { action: :show, code: token.plaintext_token }
         end
 
+        def access_grant?
+          true
+        end
+
         private
 
         def authorization_code_expires_in
-          Doorkeeper.configuration.authorization_code_expires_in
+          Doorkeeper.config.authorization_code_expires_in
         end
 
         def access_grant_attributes
-          pkce_attributes.merge(
+          attributes = {
             application_id: pre_auth.client.id,
-            resource_owner_id: resource_owner.id,
             expires_in: authorization_code_expires_in,
             redirect_uri: pre_auth.redirect_uri,
-            scopes: pre_auth.scopes.to_s
-          )
+            scopes: pre_auth.scopes.to_s,
+          }
+
+          if Doorkeeper.config.polymorphic_resource_owner?
+            attributes[:resource_owner] = resource_owner
+          else
+            attributes[:resource_owner_id] = resource_owner.id
+          end
+
+          pkce_attributes.merge(attributes).merge(custom_attributes)
+        end
+
+        def custom_attributes
+          # Custom access token attributes are saved into the access grant,
+          # and then included in subsequently generated access tokens.
+          @pre_auth.custom_access_token_attributes.to_h.with_indifferent_access
         end
 
         def pkce_attributes
@@ -47,7 +66,7 @@ module Doorkeeper
         # Ensures firstly, if migration with additional PKCE columns was
         # generated and migrated
         def pkce_supported?
-          Doorkeeper::AccessGrant.pkce_supported?
+          Doorkeeper.config.access_grant_model.pkce_supported?
         end
       end
     end

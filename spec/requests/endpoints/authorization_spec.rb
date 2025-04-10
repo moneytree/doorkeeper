@@ -68,9 +68,15 @@ feature "Authorization endpoint" do
       i_should_not_see "Authorize"
       i_should_see_translated_error_message :unsupported_response_type
     end
+
+    scenario "displays unsupported_response_mode error when using an invalid response mode" do
+      visit authorization_endpoint_url(client: @client, response_mode: "invalid_response_mode")
+      i_should_not_see "Authorize"
+      i_should_see_translated_error_message :unsupported_response_mode
+    end
   end
 
-  context "forgery protection enabled" do
+  context "when forgery protection enabled" do
     background do
       create_resource_owner
       sign_in
@@ -79,9 +85,11 @@ feature "Authorization endpoint" do
     scenario "raises exception on forged requests" do
       allowing_forgery_protection do
         expect do
-          page.driver.post authorization_endpoint_url(client_id: @client.uid,
-                                                      redirect_uri: @client.redirect_uri,
-                                                      response_type: "code")
+          page.driver.post authorization_endpoint_url(
+            client_id: @client.uid,
+            redirect_uri: @client.redirect_uri,
+            response_type: "code",
+          )
         end.to raise_error(ActionController::InvalidAuthenticityToken)
       end
     end

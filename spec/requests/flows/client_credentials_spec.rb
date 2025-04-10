@@ -2,23 +2,22 @@
 
 require "spec_helper"
 
-describe "Client Credentials Request" do
+RSpec.describe "Client Credentials Request" do
   let(:client) { FactoryBot.create :application }
 
-  context "a valid request" do
+  context "with a valid request" do
     it "authorizes the client and returns the token response" do
       headers = authorization client.uid, client.secret
       params  = { grant_type: "client_credentials" }
 
       post "/oauth/token", params: params, headers: headers
 
-      should_have_json "access_token", Doorkeeper::AccessToken.first.token
-      should_have_json_within "expires_in", Doorkeeper.configuration.access_token_expires_in, 1
-      should_not_have_json "scope"
-      should_not_have_json "refresh_token"
-
-      should_not_have_json "error"
-      should_not_have_json "error_description"
+      expect(json_response).to match(
+        "access_token" => Doorkeeper::AccessToken.first.token,
+        "token_type" => "Bearer",
+        "expires_in" => Doorkeeper.configuration.access_token_expires_in,
+        "created_at" => an_instance_of(Integer),
+      )
     end
 
     context "with scopes" do
@@ -33,34 +32,38 @@ describe "Client Credentials Request" do
 
         post "/oauth/token", params: params, headers: headers
 
-        should_have_json "access_token", Doorkeeper::AccessToken.first.token
-        should_have_json "scope", "write"
+        expect(json_response).to include(
+          "access_token" => Doorkeeper::AccessToken.first.token,
+          "scope" => "write",
+        )
       end
 
-      context "that are default" do
+      context "when scopes are default" do
         it "adds the scope to the token an returns in the response" do
           headers = authorization client.uid, client.secret
           params  = { grant_type: "client_credentials", scope: "public" }
 
           post "/oauth/token", params: params, headers: headers
 
-          should_have_json "access_token", Doorkeeper::AccessToken.first.token
-          should_have_json "scope", "public"
+          expect(json_response).to include(
+            "access_token" => Doorkeeper::AccessToken.first.token,
+            "scope" => "public",
+          )
         end
       end
 
-      context "that are invalid" do
+      context "when scopes are invalid" do
         it "does not authorize the client and returns the error" do
           headers = authorization client.uid, client.secret
           params  = { grant_type: "client_credentials", scope: "random" }
 
           post "/oauth/token", params: params, headers: headers
 
-          should_have_json "error", "invalid_scope"
-          should_have_json "error_description", translated_error_message(:invalid_scope)
-          should_not_have_json "access_token"
-
           expect(response.status).to eq(400)
+          expect(json_response).to match(
+            "error" => "invalid_scope",
+            "error_description" => translated_error_message(:invalid_scope),
+          )
         end
       end
     end
@@ -70,7 +73,7 @@ describe "Client Credentials Request" do
     before do
       Doorkeeper.configuration.instance_variable_set(
         :@allow_grant_flow_for_client,
-        ->(_grant_flow, client) { client.name == "admin" }
+        ->(_grant_flow, client) { client.name == "admin" },
       )
     end
 
@@ -82,8 +85,10 @@ describe "Client Credentials Request" do
 
       post "/oauth/token", params: params, headers: headers
 
-      should_have_json "error", "unauthorized_client"
-      should_have_json "error_description", translated_error_message(:unauthorized_client)
+      expect(json_response).to match(
+        "error" => "unauthorized_client",
+        "error_description" => translated_error_message(:unauthorized_client),
+      )
     end
 
     scenario "allows the request when satisfies condition" do
@@ -94,13 +99,12 @@ describe "Client Credentials Request" do
 
       post "/oauth/token", params: params, headers: headers
 
-      should_have_json "access_token", Doorkeeper::AccessToken.first.token
-      should_have_json_within "expires_in", Doorkeeper.configuration.access_token_expires_in, 1
-      should_not_have_json "scope"
-      should_not_have_json "refresh_token"
-
-      should_not_have_json "error"
-      should_not_have_json "error_description"
+      expect(json_response).to match(
+        "access_token" => Doorkeeper::AccessToken.first.token,
+        "token_type" => "Bearer",
+        "expires_in" => 7200,
+        "created_at" => an_instance_of(Integer),
+      )
     end
   end
 
@@ -122,8 +126,10 @@ describe "Client Credentials Request" do
       token = Doorkeeper::AccessToken.first
 
       expect(token.application_id).to eq client.id
-      should_have_json "access_token", token.token
-      should_have_json "scope", "public"
+      expect(json_response).to include(
+        "access_token" => token.token,
+        "scope" => "public",
+      )
     end
 
     it "issues new token with multiple default scopes that are present in application scopes" do
@@ -139,23 +145,84 @@ describe "Client Credentials Request" do
       token = Doorkeeper::AccessToken.first
 
       expect(token.application_id).to eq client.id
-      should_have_json "access_token", token.token
-      should_have_json "scope", "public read"
+      expect(json_response).to include(
+        "access_token" => token.token,
+        "scope" => "public read",
+      )
+    end
+
+    it "forbids the request if the public scope is not present in the application scopes" do
+      default_scopes_exist :default
+
+      headers = authorization client.uid, client.secret
+      params  = { grant_type: "client_credentials" }
+
+      post "/oauth/token", params: params, headers: headers
+
+      expect(json_response).to match(
+        "error" => "invalid_scope",
+        "error_description" => translated_error_message(:invalid_scope),
+      )
     end
   end
 
-  context "an invalid request" do
+  context "when request is invalid" do
     it "does not authorize the client and returns the error" do
       headers = {}
       params  = { grant_type: "client_credentials" }
 
       post "/oauth/token", params: params, headers: headers
 
-      should_have_json "error", "invalid_client"
-      should_have_json "error_description", translated_error_message(:invalid_client)
-      should_not_have_json "access_token"
-
       expect(response.status).to eq(401)
+
+      expect(json_response).to match(
+        "error" => "invalid_client",
+        "error_description" => translated_error_message(:invalid_client),
+      )
+    end
+  end
+
+  context "when revoke_previous_client_credentials_token is true" do
+    before do
+      allow(Doorkeeper.config).to receive(:reuse_access_token).and_return(false)
+      allow(Doorkeeper.config).to receive(:revoke_previous_client_credentials_token?).and_return(true)
+    end
+
+    it "revokes the previous token" do
+      headers = authorization client.uid, client.secret
+      params  = { grant_type: "client_credentials" }
+
+      post "/oauth/token", params: params, headers: headers
+      expect(json_response).to include("access_token" => Doorkeeper::AccessToken.first.token)
+
+      token = Doorkeeper::AccessToken.first
+
+      post "/oauth/token", params: params, headers: headers
+      expect(json_response).to include("access_token" => Doorkeeper::AccessToken.last.token)
+
+      expect(token.reload).to be_revoked
+      expect(Doorkeeper::AccessToken.last).not_to be_revoked
+    end
+
+    context "with a simultaneous request" do
+      let!(:access_token) { FactoryBot.create :access_token, resource_owner_id: nil }
+
+      before do
+        allow(Doorkeeper.config.access_token_model).to receive(:matching_token_for) { access_token }
+        allow(access_token).to receive(:revoked?).and_return(true)
+      end
+
+      it "returns an error" do
+        headers = authorization client.uid, client.secret
+        params  = { grant_type: "client_credentials" }
+
+        post "/oauth/token", params: params, headers: headers
+
+        expect(json_response).to match(
+          "error" => "invalid_token_reuse",
+          "error_description" => translated_error_message(:server_error),
+        )
+      end
     end
   end
 

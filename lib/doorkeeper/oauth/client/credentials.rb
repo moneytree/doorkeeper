@@ -9,7 +9,7 @@ module Doorkeeper
             credentials_methods.inject(nil) do |_, method|
               method = self.method(method) if method.is_a?(Symbol)
               credentials = Credentials.new(*method.call(request))
-              break credentials unless credentials.blank?
+              break credentials if credentials.present?
             end
           end
 
@@ -27,9 +27,7 @@ module Doorkeeper
 
         # Public clients may have their secret blank, but "credentials" are
         # still present
-        def blank?
-          uid.blank?
-        end
+        delegate :blank?, to: :uid
       end
     end
   end

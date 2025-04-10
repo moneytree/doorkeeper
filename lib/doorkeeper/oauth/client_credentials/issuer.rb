@@ -2,33 +2,35 @@
 
 module Doorkeeper
   module OAuth
-    class ClientCredentialsRequest < BaseRequest
+    module ClientCredentials
       class Issuer
-        attr_accessor :token, :validation, :error
+        attr_reader :token, :validator, :error
 
-        def initialize(server, validation)
+        def initialize(server, validator)
           @server = server
-          @validation = validation
+          @validator = validator
         end
 
-        def create(client, scopes, creator = Creator.new)
-          if validation.valid?
-            @token = create_token(client, scopes, creator)
+        def create(client, scopes, attributes = {}, creator = Creator.new)
+          if validator.valid?
+            @token = create_token(client, scopes, attributes, creator)
             @error = :server_error unless @token
           else
             @token = false
-            @error = validation.error
+            @error = validator.error
           end
+
           @token
         end
 
         private
 
-        def create_token(client, scopes, creator)
+        def create_token(client, scopes, attributes, creator)
           context = Authorization::Token.build_context(
             client,
             Doorkeeper::OAuth::CLIENT_CREDENTIALS,
-            scopes
+            scopes,
+            nil,
           )
           ttl = Authorization::Token.access_token_expires_in(@server, context)
 
@@ -36,7 +38,8 @@ module Doorkeeper
             client,
             scopes,
             use_refresh_token: false,
-            expires_in: ttl
+            expires_in: ttl,
+            **attributes
           )
         end
       end

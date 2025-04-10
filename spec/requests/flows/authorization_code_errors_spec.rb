@@ -4,6 +4,7 @@ require "spec_helper"
 
 feature "Authorization Code Flow Errors" do
   let(:client_params) { {} }
+
   background do
     default_scopes_exist :default
     config_is_set(:authenticate_resource_owner) { User.first || redirect_to("/sign_in") }
@@ -19,6 +20,7 @@ feature "Authorization Code Flow Errors" do
   context "with a client trying to xss resource owner" do
     let(:client_name) { "<div id='xss'>XSS</div>" }
     let(:client_params) { { name: client_name } }
+
     scenario "resource owner visit authorization endpoint" do
       visit authorization_endpoint_url(client: @client)
       expect(page).not_to have_css("#xss")
@@ -47,10 +49,13 @@ feature "Authorization Code Flow Errors" do
   end
 end
 
-describe "Authorization Code Flow Errors", "after authorization" do
+RSpec.describe "Authorization Code Flow Errors after authorization" do
   before do
     client_exists
-    authorization_code_exists application: @client
+    create_resource_owner
+    authorization_code_exists application: @client,
+                              resource_owner_id: @resource_owner.id,
+                              resource_owner_type: @resource_owner.class.name
   end
 
   it "returns :invalid_grant error when posting an already revoked grant code" do
@@ -60,11 +65,12 @@ describe "Authorization Code Flow Errors", "after authorization" do
     # Second attempt with same token
     expect do
       post token_endpoint_url(code: @authorization.token, client: @client)
-    end.to_not(change { Doorkeeper::AccessToken.count })
+    end.not_to(change { Doorkeeper::AccessToken.count })
 
-    should_not_have_json "access_token"
-    should_have_json "error", "invalid_grant"
-    should_have_json "error_description", translated_error_message("invalid_grant")
+    expect(json_response).to match(
+      "error" => "invalid_grant",
+      "error_description" => translated_error_message("invalid_grant"),
+    )
   end
 
   it "returns :invalid_grant error for invalid grant code" do
@@ -72,8 +78,9 @@ describe "Authorization Code Flow Errors", "after authorization" do
 
     access_token_should_not_exist
 
-    should_not_have_json "access_token"
-    should_have_json "error", "invalid_grant"
-    should_have_json "error_description", translated_error_message("invalid_grant")
+    expect(json_response).to match(
+      "error" => "invalid_grant",
+      "error_description" => translated_error_message("invalid_grant"),
+    )
   end
 end
