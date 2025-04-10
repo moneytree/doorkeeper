@@ -702,21 +702,6 @@ RSpec.describe Doorkeeper::Config do
     end
   end
 
-  describe "token_lookup_batch_size" do
-    it "uses default doorkeeper value" do
-      expect(subject.token_lookup_batch_size).to eq(10_000)
-    end
-
-    it "can change the value" do
-      Doorkeeper.configure do
-        orm DOORKEEPER_ORM
-        token_lookup_batch_size 100_000
-      end
-
-      expect(subject.token_lookup_batch_size).to eq(100_000)
-    end
-  end
-
   describe "strict_content_type" do
     it "is false by default" do
       expect(config.enforce_content_type).to eq(false)

@@ -623,11 +623,6 @@ module Doorkeeper
       flows.flatten.uniq
     end
 
-    def native_authorization_code_route
-      @opt_out_native_route_change ||= false
-      @opt_out_native_route_change ? '/:code' : '/native'
-    end
-
     def allow_blank_redirect_uri?(application = nil)
       if allow_blank_redirect_uri.respond_to?(:call)
         allow_blank_redirect_uri.call(grant_flows, application)

@@ -41,19 +41,6 @@ module UrlHelper
     "/oauth/authorize?#{build_query(parameters)}"
   end
 
-  def pkce_authorization_endpoint_url(options = {})
-    parameters = {
-      client_id: options[:client_id]     || options[:client].uid,
-      redirect_uri: options[:redirect_uri]  || options[:client].redirect_uri,
-      response_type: options[:response_type] || 'code',
-      scope: options[:scope],
-      state: options[:state],
-      code_challenge: options[:code_challenge],
-      code_challenge_method: options[:code_challenge_method]
-    }.reject { |k, v| v.blank? }
-    "/oauth/authorize?#{build_query(parameters)}"
-  end
-
   def refresh_token_endpoint_url(options = {})
     parameters = {
       refresh_token: options[:refresh_token],
